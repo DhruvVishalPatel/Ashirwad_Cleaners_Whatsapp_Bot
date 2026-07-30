@@ -2,6 +2,9 @@ import os
 import json
 from app.services.whatsapp_sender import send_text_message, send_interactive_buttons
 from app.core.state_machine import set_session_state, clear_session
+from app.core.translations import t
+from app.core.database import SessionLocal
+from app.models.schemas import Customer
 
 def load_price_list():
     base_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
@@ -9,7 +12,7 @@ def load_price_list():
     with open(file_path, "r") as f:
         return json.load(f)
 
-def format_category_pricing(category_key: str) -> str:
+def format_category_pricing(category_key: str, lang: str = "ENGLISH") -> str:
     data = load_price_list()
     services = data.get("services", {})
     category = services.get(category_key)
@@ -17,14 +20,21 @@ def format_category_pricing(category_key: str) -> str:
     if not category:
         return "Pricing not found."
         
-    title = category_key.replace("_", " ").title()
-    desc = category.get("description", "")
+    title = t(f"PRICING_TITLE_{category_key}", lang)
+    desc = t(f"PRICING_DESC_{category_key}", lang)
     
-    text = f"*{title} Prices* 👔\n_{desc}_\n\n"
+    text = f"*{title}* 👔\n_{desc}_\n\n"
     
     rule = category.get("business_rule")
     if rule:
-        text += f"⚠️ *Note*: {rule.get('validation_error_message')}\n\n"
+        note_msg = rule.get('validation_error_message')
+        if lang == "HINGLISH":
+            if "minimum" in note_msg.lower():
+                note_msg = "Kam se kam 5 items hone chahiye."
+        elif lang == "GUJLISH":
+            if "minimum" in note_msg.lower():
+                note_msg = "Ochha ma ochha 5 items joiye."
+        text += f"⚠️ *Note*: {note_msg}\n\n"
         
     for item in category.get("items", []):
         name = item.get("item_name")
@@ -36,21 +46,30 @@ def format_category_pricing(category_key: str) -> str:
             line += f" ({note})"
         text += line + "\n"
         
-    text += "\nTo schedule a pickup, just reply with 'Pickup'!"
+    text += t("PRICING_CATALOG_FOOTER", lang)
     return text
 
 def handle_pricing_flow(phone_number: str, text: str = "", session_data: dict = None):
     current_state = session_data.get("state") if session_data else None
     
+    # Load customer language preference
+    db = SessionLocal()
+    customer = db.query(Customer).filter(Customer.phone_number == phone_number).first()
+    lang = customer.preferred_language if customer else "ENGLISH"
+    db.close()
+    
     if not current_state or current_state == "INTENT_PRICING":
+        dry_clean_title = "Dry Clean"
+        washing_title = "Washing" if lang == "ENGLISH" else ("Washing / Dhona" if lang == "HINGLISH" else "Washing / Dhova")
+        steam_press_title = "Steam Press" if lang == "ENGLISH" else ("Steam Press / Istree" if lang == "HINGLISH" else "Steam Press / Istree")
         buttons = [
-            {"id": "btn_price_dry_clean", "title": "Dry Clean"},
-            {"id": "btn_price_washing", "title": "Washing"},
-            {"id": "btn_price_steam_press", "title": "Steam Press"}
+            {"id": "btn_price_dry_clean", "title": dry_clean_title},
+            {"id": "btn_price_washing", "title": washing_title},
+            {"id": "btn_price_steam_press", "title": steam_press_title}
         ]
         send_interactive_buttons(
             phone_number, 
-            "We have three main service categories! Which pricing list would you like to view?", 
+            t("PRICING_SELECTION_MSG", lang), 
             buttons
         )
         set_session_state(phone_number, "PRICING_AWAITING_SELECTION", {})
@@ -66,9 +85,9 @@ def handle_pricing_flow(phone_number: str, text: str = "", session_data: dict = 
         category_key = mapping.get(text)
         
         if category_key:
-            catalog_text = format_category_pricing(category_key)
+            catalog_text = format_category_pricing(category_key, lang)
             send_text_message(phone_number, catalog_text)
             clear_session(phone_number)
         else:
-            send_text_message(phone_number, "Please tap one of the category buttons above.")
+            send_text_message(phone_number, t("PRICING_AWAIT_SELECTION_ERROR", lang))
         return

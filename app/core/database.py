@@ -18,3 +18,14 @@ def get_db():
 
 def init_db():
     Base.metadata.create_all(bind=engine)
+    # Safe migration: Add preferred_language if it doesn't exist
+    from sqlalchemy import text
+    db = SessionLocal()
+    try:
+        db.execute(text("ALTER TABLE customers ADD COLUMN preferred_language VARCHAR DEFAULT 'ENGLISH'"))
+        db.commit()
+    except Exception:
+        db.rollback()
+    finally:
+        db.close()
+

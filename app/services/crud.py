@@ -138,3 +138,12 @@ def create_runner(db: Session, name: str, phone_number: str):
     db.commit()
     db.refresh(runner)
     return runner
+
+def update_customer_language(db: Session, customer_id: int, language: str):
+    customer = db.query(Customer).filter(Customer.customer_id == customer_id).first()
+    if customer:
+        customer.preferred_language = language
+        db.commit()
+        db.refresh(customer)
+    return customer
+

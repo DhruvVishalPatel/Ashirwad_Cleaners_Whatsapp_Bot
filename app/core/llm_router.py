@@ -8,17 +8,21 @@ from dotenv import load_dotenv
 load_dotenv()
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
-def classify_intent(user_text: str) -> str:
-
+def classify_intent(user_text: str) -> tuple[str, str]:
     prompt = f"""
-    You are an intent classification engine for 'Ashirwad Cleaners', a dry-cleaning business.
-    Analyze the following user input, which may be in English, Hindi, Gujarati, or code-switched (e.g., Hinglish).
+    You are an intent classification and language detection engine for 'Ashirwad Cleaners', a dry-cleaning business.
+    Analyze the following user input, which may be in English, transliterated Hindi (Hinglish), or transliterated Gujarati (Gujlish) using Latin/English script.
     
     Map the input to EXACTLY ONE of the following intents:
     - INTENT_PICKUP: The user wants to schedule a pickup or drop off clothes.
     - INTENT_STATUS: The user is asking about the status of an existing order.
     - INTENT_PRICING: The user is asking about prices, rates, or cost of services.
     - INTENT_HUMAN: The user is complaining, asking complex questions, or greeting generally without a clear goal.
+    
+    Also, detect the language style of the input:
+    - ENGLISH: If the input is primarily standard English (e.g., "I want to schedule a pickup", "what is the price").
+    - HINGLISH: If the input is Hindi transliterated in Latin script (e.g., "saree dry clean karwani hai", "mera kapda kab milega").
+    - GUJLISH: If the input is Gujarati transliterated in Latin script (e.g., "kapda dhova aapva che", "bhav ketlo thase").
     
     User Input: "{user_text}"
     """
@@ -35,9 +39,13 @@ def classify_intent(user_text: str) -> str:
                     "intent": {
                         "type": "string",
                         "enum": ["INTENT_PICKUP", "INTENT_STATUS", "INTENT_PRICING", "INTENT_HUMAN"]
+                    },
+                    "detected_language": {
+                        "type": "string",
+                        "enum": ["ENGLISH", "HINGLISH", "GUJLISH"]
                     }
                 },
-                "required": ["intent"]
+                "required": ["intent", "detected_language"]
             }
         )
     )
@@ -45,11 +53,12 @@ def classify_intent(user_text: str) -> str:
     try:
         # The output is guaranteed to be a JSON string matching the schema
         result = json.loads(response.text)
-        return result.get("intent", "INTENT_HUMAN")
+        return result.get("intent", "INTENT_HUMAN"), result.get("detected_language", "ENGLISH")
     except Exception:
-        return "INTENT_HUMAN"
+        return "INTENT_HUMAN", "ENGLISH"
 
-def generate_estimate(user_text: str) -> dict:
+
+def generate_estimate(user_text: str, language: str = "ENGLISH") -> dict:
     """Uses Gemini to match the user's clothes to the catalog across all services, then uses Python for perfectly accurate math."""
     # Load price list
     base_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
@@ -57,8 +66,8 @@ def generate_estimate(user_text: str) -> dict:
     try:
         with open(file_path, "r") as f:
             price_list = json.load(f)
-    except:
-        return {"total_items_count": 0, "base_estimate": 0.0, "identified_services": ["Dry Clean"]}
+    except Exception:
+        return {"is_question": False, "reply": "", "total_items_count": 0, "base_estimate": 0.0, "identified_services": ["Dry Clean"], "garments": []}
 
     all_valid_items = {}
     catalog_summary = {}
@@ -79,6 +88,7 @@ def generate_estimate(user_text: str) -> dict:
     
     Instructions:
     1. If the user is asking a question (e.g., about pricing, services, or general chat), set 'is_question_or_conversational' to true and provide a helpful 'conversational_reply' based on the price list provided.
+       CRITICAL: Write the 'conversational_reply' in {language} transliterated into the Latin (English) script. For example, if {language} is HINGLISH, write in Hindi using English letters (e.g., "Aapka dry clean ka cost..."). If {language} is GUJLISH, write in Gujarati using English letters (e.g., "Aapna dry clean no bhav...").
     2. If they are listing garments for pickup, extract all garments and their quantities into the 'garments' array.
     3. Determine which service category they want for each garment based on their input (e.g., 'washing', 'dry_clean', 'steam_press'). If they don't explicitly specify, default to 'dry_clean'.
     4. Normalize each garment strictly to one of the valid item names in the chosen category. Handle synonyms (e.g., 'jeans' -> 'Pant').
@@ -164,3 +174,4 @@ def generate_estimate(user_text: str) -> dict:
         
     except Exception:
         return {"is_question": False, "reply": "", "total_items_count": 0, "base_estimate": 0.0, "identified_services": ["Dry Clean"], "garments": []}
+

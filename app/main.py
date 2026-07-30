@@ -7,7 +7,8 @@ from dotenv import load_dotenv
 from app.core.database import SessionLocal, init_db
 from app.core.state_machine import get_session, set_session_state
 from app.core.llm_router import classify_intent
-from app.services.crud import get_customer, create_customer
+from app.services.crud import get_customer, create_customer, update_customer_language
+from app.core.translations import t
 
 from app.flows.pickup import handle_pickup_flow
 from app.flows.status import handle_status_flow
@@ -39,6 +40,15 @@ def process_whatsapp_message(payload: dict):
         message = messages[0]
         phone_number = message.get("from")
         
+        db = SessionLocal()
+        
+        # 1. Check or Create Customer
+        customer = get_customer(db, phone_number)
+        if not customer:
+            customer = create_customer(db, phone_number)
+            
+        lang = customer.preferred_language or "ENGLISH"
+
         # Working Hours Check
         from datetime import datetime, time
         from zoneinfo import ZoneInfo
@@ -46,9 +56,9 @@ def process_whatsapp_message(payload: dict):
         now = datetime.now(ist)
         if not (time(9, 0) <= now.time() <= time(20, 30)):
             from app.services.whatsapp_sender import send_text_message
-            send_text_message(phone_number, "🌙 Ashirwad Cleaners is currently closed. Our working hours are from 9:00 AM to 8:30 PM. Please message us during working hours to schedule your pickup!")
+            send_text_message(phone_number, t("CLOSED_WARNING", lang))
+            db.close()
             return {"status": "ok"}
-        
         
         # Handle Interactive vs Text
         if message.get("type") == "interactive":
@@ -64,13 +74,6 @@ def process_whatsapp_message(payload: dict):
         else:
             text = message.get("text", {}).get("body", "")
             
-        db = SessionLocal()
-        
-        # 1. Check or Create Customer
-        customer = get_customer(db, phone_number)
-        if not customer:
-            customer = create_customer(db, phone_number)
-            
         # 2. Check Session
         session = get_session(phone_number)
         
@@ -83,7 +86,7 @@ def process_whatsapp_message(payload: dict):
                 handle_pricing_flow(phone_number, text, session)
             else:
                 # Fallback for stuck session
-                send_text_message(phone_number, "I'm not sure how to handle that. Let's start over. What do you need?")
+                send_text_message(phone_number, t("FALLBACK_STUCK_SESSION", lang))
                 from app.core.state_machine import clear_session
                 clear_session(phone_number)
         else:
@@ -96,7 +99,11 @@ def process_whatsapp_message(payload: dict):
             elif text == "btn_intent_pricing":
                 intent = "INTENT_PRICING"
             else:
-                intent = classify_intent(text)
+                intent, detected_lang = classify_intent(text)
+                # Update preferred language in DB
+                update_customer_language(db, customer.customer_id, detected_lang)
+                customer.preferred_language = detected_lang
+                lang = detected_lang
             
             if intent == "INTENT_PICKUP":
                 # Start pickup flow
@@ -108,14 +115,18 @@ def process_whatsapp_message(payload: dict):
                 handle_pricing_flow(phone_number, text, {"state": "INTENT_PRICING", "data": {}})
             else:
                 from app.services.whatsapp_sender import send_interactive_buttons
+                pickup_title = "Pickup" if lang == "ENGLISH" else "Pickup / Book"
+                status_title = "Status" if lang == "ENGLISH" else "Status / Track"
+                pricing_title = "Pricing" if lang == "ENGLISH" else "Pricing / Catalog"
+                
                 buttons = [
-                    {"id": "btn_intent_pickup", "title": "Pickup"},
-                    {"id": "btn_intent_status", "title": "Status"},
-                    {"id": "btn_intent_pricing", "title": "Pricing"}
+                    {"id": "btn_intent_pickup", "title": pickup_title},
+                    {"id": "btn_intent_status", "title": status_title},
+                    {"id": "btn_intent_pricing", "title": pricing_title}
                 ]
                 send_interactive_buttons(
                     phone_number, 
-                    "🙏 Namaste! Welcome to Ashirwad Cleaners.\nWe are here to take care of your favorite garments—from daily wear to heavy festive sarees, sherwanis, and household blankets. \nHow can we help you today? Please choose an option below:", 
+                    t("WELCOME_MSG", lang), 
                     buttons
                 )
                 
