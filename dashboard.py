@@ -13,6 +13,40 @@ from app.services.crud import create_customer, create_order, get_customer, get_r
 
 st.set_page_config(page_title="Ashirwad Cleaners Admin", layout="wide")
 
+# ----- ADMIN AUTHENTICATION SECURITY -----
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+
+def check_login():
+    username = st.session_state.login_username
+    password = st.session_state.login_password
+    
+    env_user = os.getenv("ADMIN_USERNAME", "admin")
+    env_pass = os.getenv("ADMIN_PASSWORD", "ashirwad123")
+    
+    if username == env_user and password == env_pass:
+        st.session_state.logged_in = True
+        st.session_state.login_error = False
+    else:
+        st.session_state.logged_in = False
+        st.session_state.login_error = True
+
+if not st.session_state.logged_in:
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.markdown("<br><br>", unsafe_allow_html=True)
+        st.markdown("## 🧺 Ashirwad Cleaners: Admin Login")
+        st.markdown("Please enter your administrator credentials to access the live dashboard.")
+        
+        st.text_input("Username", key="login_username")
+        st.text_input("Password", type="password", key="login_password")
+        
+        if st.session_state.get("login_error"):
+            st.error("❌ Incorrect username or password. Please try again.")
+            
+        st.button("Log In", on_click=check_login, use_container_width=True)
+    st.stop()
+
 st.title("🧺 Ashirwad Cleaners: Admin Dashboard")
 
 # Initialize database session
