@@ -74,6 +74,15 @@ def process_whatsapp_message(payload: dict):
         else:
             text = message.get("text", {}).get("body", "")
             
+        # 1.5. Check for Global Reset/Cancel Command
+        clean_text = text.strip().lower()
+        reset_keywords = ["cancel", "restart", "start over", "reset", "radd", "cancel karo", "shuru se", "radd karo", "chodi do", "fari shuru karo"]
+        if clean_text in reset_keywords:
+            from app.core.state_machine import clear_session
+            clear_session(phone_number)
+            send_text_message(phone_number, t("SESSION_CANCELLED", lang))
+            return
+
         # 2. Check Session
         session = get_session(phone_number)
         

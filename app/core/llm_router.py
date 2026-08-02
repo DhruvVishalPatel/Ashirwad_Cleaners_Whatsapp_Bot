@@ -87,12 +87,13 @@ def generate_estimate(user_text: str, language: str = "ENGLISH") -> dict:
     Customer Input: "{user_text}"
     
     Instructions:
-    1. If the user is asking a question (e.g., about pricing, services, or general chat), set 'is_question_or_conversational' to true and provide a helpful 'conversational_reply' based on the price list provided.
+    1. If the user is asking a question (e.g., about pricing, services, or general chat), OR if their input is vague/incomplete as described in step 6, set 'is_question_or_conversational' to true and provide a helpful 'conversational_reply' based on the price list provided.
        CRITICAL: Write the 'conversational_reply' in {language} transliterated into the Latin (English) script. For example, if {language} is HINGLISH, write in Hindi using English letters (e.g., "Aapka dry clean ka cost..."). If {language} is GUJLISH, write in Gujarati using English letters (e.g., "Aapna dry clean no bhav...").
     2. If they are listing garments for pickup, extract all garments and their quantities into the 'garments' array.
     3. Determine which service category they want for each garment based on their input (e.g., 'washing', 'dry_clean', 'steam_press'). If they don't explicitly specify, default to 'dry_clean'.
     4. Normalize each garment strictly to one of the valid item names in the chosen category. Handle synonyms (e.g., 'jeans' -> 'Pant').
     5. If an item cannot be matched at all, just return it as 'Unknown'.
+    6. If the user is trying to request a pickup but their request is too vague (e.g., they just say "laundry", "laundry karvana hai", "laundry dhoni hai", "laundry no order apo" without specifying counts or garment types), set 'is_question_or_conversational' to true, keep 'garments' empty, and write a polite 'conversational_reply' in {language} (using Latin script) asking them to specify the clothes and services (e.g. "Kripya apne kapde aur unki service list karein, jaise: 2 shirts for washing, 1 saree for dry clean").
     
     Output ONLY valid JSON matching the schema. Do not do any math.
     """

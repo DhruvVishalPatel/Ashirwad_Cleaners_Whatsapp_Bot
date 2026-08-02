@@ -7,9 +7,50 @@ from app.core.llm_router import generate_estimate
 from app.models.schemas import Customer
 from app.core.translations import t
 
+import re
+
 def get_customer_name(db, customer_id: int):
     customer = db.query(Customer).filter(Customer.customer_id == customer_id).first()
     return customer.name if customer else None
+
+def match_button_synonym(text: str, state: str) -> str:
+    clean_text = text.strip().lower()
+    
+    # If the user actually clicked the button, return the button ID directly
+    if clean_text in ["btn_redeem_yes", "btn_redeem_no", "btn_addr_yes", "btn_addr_new"]:
+        return text.strip()
+        
+    if state == "PICKUP_AWAITING_POINTS_REDEEM":
+        yes_syns = ["yes", "y", "yeah", "ok", "okay", "sure", "redeem", "haan", "ha", "theek hai", "chalega", "use karo", "saras", "vapro", "please use"]
+        no_syns = ["no", "n", "nope", "save", "later", "save for later", "nahi", "na", "baad mein", "pachhi", "bachavo", "keep", "don't redeem"]
+        if clean_text in yes_syns:
+            return "btn_redeem_yes"
+        if clean_text in no_syns:
+            return "btn_redeem_no"
+            
+    elif state == "PICKUP_AWAITING_ADDRESS_BUTTON":
+        yes_syns = ["yes", "y", "yeah", "ok", "okay", "sure", "use saved", "saved", "saved address", "same", "same address", "haan", "ha", "theek hai", "chalega", "use karo", "saras", "chalsho", "vapro", "use this"]
+        new_syns = ["new", "new address", "change", "change address", "different", "different address", "naya", "naya address", "badlo", "change karo", "navu", "navu address", "other", "another"]
+        if clean_text in yes_syns:
+            return "btn_addr_yes"
+        if clean_text in new_syns:
+            return "btn_addr_new"
+            
+    return text  # Return original if no match
+
+def extract_coords_from_url(url: str):
+    # Matches patterns like q=23.0125,72.5654 or query=23.0125,72.5654
+    match = re.search(r'(?:q|query|ll)=([+-]?\d+\.\d+),([+-]?\d+\.\d+)', url)
+    if match:
+        return float(match.group(1)), float(match.group(2))
+    return None
+
+def is_in_paldi_coordinate(lat: float, lon: float) -> bool:
+    # Bounding box for Paldi area in Ahmedabad
+    return (23.000 <= lat <= 23.028) and (72.550 <= lon <= 72.580)
+
+def is_in_paldi_text(address: str) -> bool:
+    return "paldi" in address.lower()
 
 def handle_pickup_flow(phone_number: str, text: str, db, session_data: dict = None):
     current_state = session_data.get("state") if session_data else None
@@ -110,11 +151,12 @@ def handle_pickup_flow(phone_number: str, text: str, db, session_data: dict = No
         
     # 4.5. Points Redemption Received
     if current_state == "PICKUP_AWAITING_POINTS_REDEEM":
+        button_id = match_button_synonym(text, current_state)
         points_redeemed = 0
-        if text == "btn_redeem_yes":
+        if button_id == "btn_redeem_yes":
             points_redeemed = data.get("max_redeemable", 0)
             update_session_data(phone_number, "points_redeemed", points_redeemed)
-        elif text == "btn_redeem_no":
+        elif button_id == "btn_redeem_no":
             update_session_data(phone_number, "points_redeemed", 0)
         else:
             send_text_message(phone_number, t("BUTTON_SELECTION_ERROR", lang))
@@ -133,7 +175,8 @@ def handle_pickup_flow(phone_number: str, text: str, db, session_data: dict = No
 
     # 4.5. Address Button Received
     if current_state == "PICKUP_AWAITING_ADDRESS_BUTTON":
-        if text == "btn_addr_yes":
+        button_id = match_button_synonym(text, current_state)
+        if button_id == "btn_addr_yes":
             flat_address = data.get("saved_address")
             
             count = data.get("count", 0)
@@ -161,7 +204,7 @@ def handle_pickup_flow(phone_number: str, text: str, db, session_data: dict = No
             clear_session(phone_number)
             return
             
-        elif text == "btn_addr_new":
+        elif button_id == "btn_addr_new":
             send_text_message(phone_number, t("ADDRESS_INPUT_NEW_REQUEST", lang))
             set_session_state(phone_number, "PICKUP_AWAITING_CONFIRMATION_ADDRESS", data)
             return
@@ -176,23 +219,42 @@ def handle_pickup_flow(phone_number: str, text: str, db, session_data: dict = No
         
         # Check if it's a GPS pin (lat,long) from WhatsApp
         is_gps = False
+        lat_val, lon_val = 0.0, 0.0
         try:
             parts = flat_address.split(",")
             if len(parts) == 2:
-                float(parts[0])
-                float(parts[1])
+                lat_val = float(parts[0])
+                lon_val = float(parts[1])
                 is_gps = True
         except ValueError:
             pass
             
-        if "google.com/maps" in flat_address or is_gps:
+        # Parse coordinates from Google Maps links if present
+        if not is_gps and ("google.com/maps" in flat_address or "maps.google.com" in flat_address):
+            coords = extract_coords_from_url(flat_address)
+            if coords:
+                lat_val, lon_val = coords
+                is_gps = True
+                
+        # Validate coordinates/address limits
+        if is_gps or "google.com/maps" in flat_address or "maps.google.com" in flat_address:
             if is_gps:
-                update_customer_location(db, customer_id, f"https://www.google.com/maps/search/?api=1&query={flat_address}")
+                if not is_in_paldi_coordinate(lat_val, lon_val):
+                    send_text_message(phone_number, t("OUTSIDE_PALDI_GPS", lang))
+                    return
+                update_customer_location(db, customer_id, f"https://www.google.com/maps/search/?api=1&query={lat_val},{lon_val}")
             else:
+                # Fallback check for URL queries
+                if not is_in_paldi_text(flat_address):
+                    send_text_message(phone_number, t("OUTSIDE_PALDI_TEXT", lang))
+                    return
                 update_customer_location(db, customer_id, flat_address)
             flat_address = "Provided via GPS Pin"
         else:
-            # Only save text address if it's actual text
+            # Text Address Check
+            if not is_in_paldi_text(flat_address):
+                send_text_message(phone_number, t("OUTSIDE_PALDI_TEXT", lang))
+                return
             update_customer_saved_address(db, customer_id, flat_address)
             
         count = data.get("count", 0)

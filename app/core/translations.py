@@ -153,6 +153,21 @@ TRANSLATIONS = {
         "ENGLISH": "Standalone professional heavy industrial steam pressing only",
         "HINGLISH": "Professional industrial steam pressing / istree sirf",
         "GUJLISH": "Professional industrial steam pressing / istree khali"
+    },
+    "SESSION_CANCELLED": {
+        "ENGLISH": "Your request has been cancelled. How can I help you today?",
+        "HINGLISH": "Aapki request cancel kar di gayi hai. Main aapki kya madad kar sakta hoon?",
+        "GUJLISH": "Aapni request cancel kari didhi che. Hu aapni su madad kari shaku?"
+    },
+    "OUTSIDE_PALDI_GPS": {
+        "ENGLISH": "📍 Your GPS location appears to be outside our service area. We currently only offer pickup and delivery in the Paldi area. Please reply with your exact Paldi address or location pin.",
+        "HINGLISH": "📍 Aapka GPS location hamare service area se bahar lag raha hai. Hum abhi sirf Paldi area mein pickup aur delivery karte hain. Kripya apna Paldi ka address ya location pin bhejein.",
+        "GUJLISH": "📍 Aapnu GPS location amara service area ni bahar dekhay che. Ame hamna khali Paldi area ma j pickup ane delivery kariye chhiye. Kripa kari aapnu Paldi nu address ke location pin moklo."
+    },
+    "OUTSIDE_PALDI_TEXT": {
+        "ENGLISH": "📍 It looks like your address is not in Paldi. We currently only offer service in the Paldi area. Please reply with your exact Paldi address or location pin.",
+        "HINGLISH": "📍 Lagta hai aapka address Paldi mein nahi hai. Hum abhi sirf Paldi area mein service dete hain. Kripya apna sahi Paldi ka address ya location pin bhejein.",
+        "GUJLISH": "📍 Lage che aapnu address Paldi ma nathi. Ame hamna khali Paldi area ma j service aapiye chhiye. Kripa kari aapnu sahi Paldi nu address ke location pin moklo."
     }
 }
 
