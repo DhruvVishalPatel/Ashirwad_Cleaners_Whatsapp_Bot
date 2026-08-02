@@ -24,6 +24,9 @@ def classify_intent(user_text: str) -> tuple[str, str]:
     - HINGLISH: If the input is Hindi transliterated in Latin script (e.g., "saree dry clean karwani hai", "mera kapda kab milega").
     - GUJLISH: If the input is Gujarati transliterated in Latin script (e.g., "kapda dhova aapva che", "bhav ketlo thase").
     
+    CRITICAL CONSTRAINT FOR LANGUAGE:
+    Generic, ambiguous, or extremely short greetings/inputs (such as "hi", "hello", "hey", "yes", "no") lack distinct linguistic markers. You MUST default them to "ENGLISH" or "HINGLISH" unless the message contains a distinct language marker (like "kem cho" or "karanu che" for GUJLISH, or "karna hai" or "bhav" for HINGLISH).
+    
     User Input: "{user_text}"
     """
 
