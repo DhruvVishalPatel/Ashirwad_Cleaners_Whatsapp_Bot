@@ -71,7 +71,7 @@ def get_available_points(db: Session, customer_id: int) -> int:
                     break
                     
     # Sum only unexpired points
-    available = sum(b['amount'] for b in buckets if b['amount'] > 0 and b['expires_at'] > now)
+    available = sum(b['amount'] for b in buckets if b['amount'] > 0 and (b['expires_at'] is None or b['expires_at'] > now))
     return available
 
 def add_points_transaction(db: Session, customer_id: int, points: int, transaction_type: str, order_id: str = None):

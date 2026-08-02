@@ -29,7 +29,7 @@ def classify_intent(user_text: str) -> tuple[str, str]:
 
     # Enforce strict JSON output matching our schema
     response = client.models.generate_content(
-        model="gemini-2.5-flash-lite",
+        model="gemini-2.5-flash",
         contents=prompt,
         config=types.GenerateContentConfig(
             response_mime_type="application/json",
@@ -99,7 +99,7 @@ def generate_estimate(user_text: str, language: str = "ENGLISH") -> dict:
     """
 
     response = client.models.generate_content(
-        model="gemini-2.5-flash-lite",
+        model="gemini-2.5-flash",
         contents=prompt,
         config=types.GenerateContentConfig(
             response_mime_type="application/json",

@@ -8,3 +8,4 @@ streamlit
 pandas
 requests
 psycopg2-binary
+langgraph
