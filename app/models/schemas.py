@@ -74,7 +74,7 @@ class Order(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     
     customer = relationship("Customer", back_populates="orders")
-    items = relationship("OrderItem", back_populates="order")
+    items = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
 
 class OrderItem(Base):
     __tablename__ = 'order_items'
@@ -92,3 +92,12 @@ class Runner(Base):
     runner_id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False)
     phone_number = Column(String, unique=True, index=True, nullable=False)
+
+class CatalogItem(Base):
+    __tablename__ = 'catalog_items'
+    id = Column(Integer, primary_key=True, index=True)
+    service_type = Column(String, nullable=False) # e.g. "dry_clean", "washing", "steam_press", "petrol_wash"
+    item_name = Column(String, nullable=False)
+    price = Column(Float, nullable=False)
+    is_variable = Column(Boolean, default=False)
+    note = Column(String, nullable=True)

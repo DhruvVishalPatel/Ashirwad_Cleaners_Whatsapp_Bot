@@ -8,7 +8,7 @@ from langgraph.checkpoint.memory import MemorySaver
 
 from app.core.database import SessionLocal
 from app.models.schemas import Customer, Order, OrderStatus
-from app.services.whatsapp_sender import send_text_message, send_interactive_buttons
+from app.services.whatsapp_sender import send_text_message, send_interactive_buttons, send_image_message
 from app.core.translations import t
 from app.core.llm_router import classify_intent, generate_estimate
 from app.services.crud import (
@@ -89,6 +89,8 @@ class BotState(TypedDict):
     promo_msg: str
     max_redeemable: int
     final_estimate: float
+    pending_items_input: str
+    direct_order_prefix: str
 
 # ----------------- GRAPH NODES -----------------
 
@@ -192,7 +194,8 @@ def classifier_node(state: BotState) -> Dict[str, Any]:
         "INTENT_PICKUP": "PICKUP",
         "INTENT_STATUS": "STATUS",
         "INTENT_PRICING": "PRICING",
-        "INTENT_GREETING": "GREETING"
+        "INTENT_GREETING": "GREETING",
+        "INTENT_QA": "QA"
     }
     
     return {
@@ -207,11 +210,11 @@ def greeting_node(state: BotState) -> Dict[str, Any]:
     """
     lang = state["language"]
     buttons = [
-        {"id": "btn_intent_pickup", "title": t("GREETING_BUTTON_PICKUP", lang)},
         {"id": "btn_intent_pricing", "title": t("GREETING_BUTTON_PRICING", lang)},
-        {"id": "btn_intent_status", "title": t("GREETING_BUTTON_STATUS", lang)}
+        {"id": "btn_intent_status", "title": t("GREETING_BUTTON_STATUS", lang)},
+        {"id": "btn_intent_pickup", "title": t("GREETING_BUTTON_PICKUP", lang)}
     ]
-    send_interactive_buttons(state["phone_number"], t("GREETING_MESSAGE", lang), buttons)
+    send_interactive_buttons(state["phone_number"], t("WELCOME_MSG", lang), buttons)
     
     return {
         "current_flow": "IDLE",
@@ -222,16 +225,32 @@ def greeting_node(state: BotState) -> Dict[str, Any]:
 def pickup_name_node(state: BotState) -> Dict[str, Any]:
     """
     Asks the customer for their name if not already cached.
+    Supports directly parsing garments from the initial message.
     """
     lang = state["language"]
+    input_text = state["text_input"].strip()
+    clean_input = input_text.lower()
+    is_direct_order = not (clean_input in ["pickup", "btn_intent_pickup", "order", "book", "laundry", "dry clean", "steam press"])
     
     if state.get("current_state") == "PICKUP_AWAITING_NAME":
         # Process the name input
-        name = state["text_input"].strip()
+        name = input_text
         db = SessionLocal()
         update_customer_name(db, state["customer_id"], name)
         db.close()
         
+        # If there's a pending garments list from the previous turn, process it immediately
+        pending_items = state.get("pending_items_input")
+        if pending_items:
+            return {
+                "customer_name": name,
+                "text_input": pending_items,  # Override input for the next node (pickup_items_node)
+                "pending_items_input": "",
+                "direct_order_prefix": t("NEW_CUSTOMER_PREFIX", lang, name=name),
+                "current_state": "PICKUP_AWAITING_ITEMS",
+                "response_sent": False  # Execute pickup_items_node immediately in the same turn
+            }
+            
         send_text_message(state["phone_number"], t("WELCOME_BACK", lang, name=name))
         return {
             "customer_name": name,
@@ -246,15 +265,24 @@ def pickup_name_node(state: BotState) -> Dict[str, Any]:
     db.close()
     
     if cached_name:
-        send_text_message(state["phone_number"], t("WELCOME_BACK", lang, name=cached_name))
-        return {
-            "customer_name": cached_name,
-            "current_state": "PICKUP_AWAITING_ITEMS",
-            "response_sent": True
-        }
+        if is_direct_order:
+            return {
+                "customer_name": cached_name,
+                "direct_order_prefix": t("WELCOME_BACK_PREFIX", lang, name=cached_name),
+                "current_state": "PICKUP_AWAITING_ITEMS",
+                "response_sent": False  # Execute pickup_items_node immediately in the same turn
+            }
+        else:
+            send_text_message(state["phone_number"], t("WELCOME_BACK", lang, name=cached_name))
+            return {
+                "customer_name": cached_name,
+                "current_state": "PICKUP_AWAITING_ITEMS",
+                "response_sent": True
+            }
     else:
         send_text_message(state["phone_number"], t("ASK_NAME", lang))
         return {
+            "pending_items_input": state["text_input"] if is_direct_order else "",
             "current_state": "PICKUP_AWAITING_NAME",
             "response_sent": True
         }
@@ -314,24 +342,25 @@ def pickup_items_node(state: BotState) -> Dict[str, Any]:
         "final_estimate": final_estimate,
         "garments_list": estimate_data.get("garments", [])
     }
-    
-    # Check Ashirwad Points balance
+     # Check Ashirwad Points balance
     db = SessionLocal()
     available_points = get_available_points(db, state["customer_id"])
     db.close()
+    
+    prefix = state.get("direct_order_prefix", "")
     
     if available_points >= 50:
         max_redeemable = min(available_points, int(final_estimate))
         update_dict["max_redeemable"] = max_redeemable
         
-        combined_msg = t("POINTS_OFFER", lang, 
-                         promo_msg=promo_msg, 
-                         total_count=total_count, 
-                         base_estimate=base_estimate, 
-                         delivery_str=delivery_str, 
-                         final_estimate=final_estimate, 
-                         available_points=available_points, 
-                         max_redeemable=max_redeemable)
+        combined_msg = prefix + t("POINTS_OFFER", lang, 
+                          promo_msg=promo_msg, 
+                          total_count=total_count, 
+                          base_estimate=base_estimate, 
+                          delivery_str=delivery_str, 
+                          final_estimate=final_estimate, 
+                          available_points=available_points, 
+                          max_redeemable=max_redeemable)
         buttons = [
             {"id": "btn_redeem_yes", "title": t("POINTS_BUTTON_YES", lang, max_redeemable=max_redeemable)},
             {"id": "btn_redeem_no", "title": t("POINTS_BUTTON_NO", lang)}
@@ -339,10 +368,12 @@ def pickup_items_node(state: BotState) -> Dict[str, Any]:
         send_interactive_buttons(state["phone_number"], combined_msg, buttons)
         update_dict["current_state"] = "PICKUP_AWAITING_POINTS_REDEEM"
         update_dict["response_sent"] = True
+        update_dict["direct_order_prefix"] = ""
         return update_dict
 
     # No points, proceed directly to address
     update_dict["points_redeemed"] = 0
+    update_dict["direct_order_prefix"] = ""
     return trigger_address_verification(state, update_dict)
 
 def trigger_address_verification(state: BotState, state_updates: dict) -> dict:
@@ -360,6 +391,8 @@ def trigger_address_verification(state: BotState, state_updates: dict) -> dict:
     final_estimate = state_updates.get("final_estimate", state.get("final_estimate", 0.0))
     points_redeemed = state_updates.get("points_redeemed", state.get("points_redeemed", 0))
     
+    prefix = state_updates.get("direct_order_prefix", state.get("direct_order_prefix", ""))
+    
     if points_redeemed > 0:
         final_estimate -= points_redeemed
         promo_msg += t("POINTS_APPLIED_MSG", lang, points_redeemed=points_redeemed)
@@ -369,7 +402,7 @@ def trigger_address_verification(state: BotState, state_updates: dict) -> dict:
     
     if saved_address:
         state_updates["saved_address"] = saved_address
-        combined_msg = t("ADDRESS_CONFIRMATION_SAVED", lang,
+        combined_msg = prefix + t("ADDRESS_CONFIRMATION_SAVED", lang,
                          base_estimate=base_estimate,
                          delivery_str=delivery_str,
                          promo_msg=promo_msg,
@@ -382,7 +415,7 @@ def trigger_address_verification(state: BotState, state_updates: dict) -> dict:
         send_interactive_buttons(state["phone_number"], combined_msg, buttons)
         state_updates["current_state"] = "PICKUP_AWAITING_ADDRESS_BUTTON"
     else:
-        combined_msg = t("ADDRESS_CONFIRMATION_NEW", lang,
+        combined_msg = prefix + t("ADDRESS_CONFIRMATION_NEW", lang,
                          base_estimate=base_estimate,
                          delivery_str=delivery_str,
                          promo_msg=promo_msg,
@@ -390,6 +423,7 @@ def trigger_address_verification(state: BotState, state_updates: dict) -> dict:
         send_text_message(state["phone_number"], combined_msg)
         state_updates["current_state"] = "PICKUP_AWAITING_CONFIRMATION_ADDRESS"
         
+    state_updates["direct_order_prefix"] = ""
     state_updates["response_sent"] = True
     return state_updates
 
@@ -524,86 +558,21 @@ def pickup_address_node(state: BotState) -> Dict[str, Any]:
 
 def pricing_node(state: BotState) -> Dict[str, Any]:
     """
-    Displays the catalog selection buttons and formatting.
+    Directly sends the static price list image to the customer.
     """
     lang = state["language"]
-    text = state["text_input"]
-    curr_state = state.get("current_state")
     
-    if not curr_state or curr_state != "PRICING_AWAITING_SELECTION":
-        dry_clean_title = "Dry Clean"
-        washing_title = "Washing" if lang == "ENGLISH" else ("Washing / Dhona" if lang == "HINGLISH" else "Washing / Dhova")
-        steam_press_title = "Steam Press" if lang == "ENGLISH" else ("Steam Press / Istree" if lang == "HINGLISH" else "Steam Press / Istree")
-        buttons = [
-            {"id": "btn_price_dry_clean", "title": dry_clean_title},
-            {"id": "btn_price_washing", "title": washing_title},
-            {"id": "btn_price_steam_press", "title": steam_press_title}
-        ]
-        send_interactive_buttons(state["phone_number"], t("PRICING_SELECTION_MSG", lang), buttons)
-        return {
-            "current_state": "PRICING_AWAITING_SELECTION",
-            "response_sent": True
-        }
-        
-    # Process choice
-    mapping = {
-        "btn_price_dry_clean": "dry_clean",
-        "btn_price_washing": "washing",
-        "btn_price_steam_press": "steam_press"
+    # Construct base URL for static image serving
+    base_url = os.environ.get("BASE_URL", "https://api.ashirwadcleaners.in")
+    image_url = f"{base_url}/static/price_list.png"
+    
+    send_image_message(state["phone_number"], image_url, t("PRICING_IMAGE_CAPTION", lang))
+    
+    return {
+        "current_flow": "IDLE",
+        "current_state": "",
+        "response_sent": True
     }
-    category_key = mapping.get(text)
-    
-    if category_key:
-        # Load price list
-        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-        file_path = os.path.join(base_dir, "price_list.json")
-        with open(file_path, "r") as f:
-            price_list = json.load(f)
-            
-        services = price_list.get("services", {})
-        category = services.get(category_key)
-        
-        if not category:
-            send_text_message(state["phone_number"], "Pricing not found.")
-            return {"current_flow": "IDLE", "current_state": "", "response_sent": True}
-            
-        title = t(f"PRICING_TITLE_{category_key}", lang)
-        desc = t(f"PRICING_DESC_{category_key}", lang)
-        
-        text_out = f"*{title}* 👔\n_{desc}_\n\n"
-        
-        rule = category.get("business_rule")
-        if rule:
-            note_msg = rule.get('validation_error_message')
-            if lang == "HINGLISH":
-                if "minimum" in note_msg.lower():
-                    note_msg = "Kam se kam 5 items hone chahiye."
-            elif lang == "GUJLISH":
-                if "minimum" in note_msg.lower():
-                    note_msg = "Ochha ma ochha 5 items joiye."
-            text_out += f"⚠️ *Note*: {note_msg}\n\n"
-            
-        for item in category.get("items", []):
-            name = item.get("item_name")
-            price = item.get("base_price")
-            note = item.get("note")
-            
-            line = f"• {name}: ₹{price}"
-            if note:
-                line += f" ({note})"
-            text_out += line + "\n"
-            
-        text_out += t("PRICING_CATALOG_FOOTER", lang)
-        send_text_message(state["phone_number"], text_out)
-        
-        return {
-            "current_flow": "IDLE",
-            "current_state": "",
-            "response_sent": True
-        }
-    else:
-        send_text_message(state["phone_number"], t("PRICING_AWAIT_SELECTION_ERROR", lang))
-        return {"response_sent": True}
 
 def status_node(state: BotState) -> Dict[str, Any]:
     """
@@ -697,6 +666,15 @@ def route_next_node(state: BotState) -> str:
 
 # ----------------- COMPILE THE STATE GRAPH -----------------
 
+def route_after_node(state: BotState) -> str:
+    """
+    Decides whether to terminate the graph run (if response was sent) 
+    or continue routing within the same turn.
+    """
+    if state.get("response_sent"):
+        return END
+    return route_next_node(state)
+
 builder = StateGraph(BotState)
 
 # Add Nodes
@@ -713,7 +691,7 @@ builder.add_node("qa", qa_node)
 # Add Edges
 builder.add_edge(START, "classifier")
 
-# Conditional Router Edge
+# Conditional Router Edge from Classifier
 builder.add_conditional_edges(
     "classifier",
     route_next_node,
@@ -730,15 +708,24 @@ builder.add_conditional_edges(
     }
 )
 
-# Connect flow endpoints back to END
-builder.add_edge("greeting", END)
-builder.add_edge("status", END)
-builder.add_edge("pricing", END)
-builder.add_edge("qa", END)
-builder.add_edge("pickup_name", END)
-builder.add_edge("pickup_items", END)
-builder.add_edge("pickup_points", END)
-builder.add_edge("pickup_address", END)
+# Conditional Router Edges from All Flow Nodes
+nodes_to_route = ["greeting", "pickup_name", "pickup_items", "pickup_points", "pickup_address", "pricing", "status", "qa"]
+for node in nodes_to_route:
+    builder.add_conditional_edges(
+        node,
+        route_after_node,
+        {
+            "greeting": "greeting",
+            "status": "status",
+            "pricing": "pricing",
+            "qa": "qa",
+            "pickup_name": "pickup_name",
+            "pickup_items": "pickup_items",
+            "pickup_points": "pickup_points",
+            "pickup_address": "pickup_address",
+            END: END
+        }
+    )
 
 # In-Memory thread checkpointer
 memory = MemorySaver()

@@ -17,7 +17,8 @@ def classify_intent(user_text: str) -> tuple[str, str]:
     - INTENT_PICKUP: The user wants to schedule a pickup or drop off clothes.
     - INTENT_STATUS: The user is asking about the status of an existing order.
     - INTENT_PRICING: The user is asking about prices, rates, or cost of services.
-    - INTENT_HUMAN: The user is complaining, asking complex questions, or greeting generally without a clear goal.
+    - INTENT_GREETING: General greetings, hellos, start-of-conversation indicators (e.g. "hi", "hello", "hey", "kem cho", "namaste").
+    - INTENT_QA: The user is asking questions about delivery times, business rules, service locations, specific items, or seeking help/complaining (e.g. "how much time for delivery", "carpet wash hota hai").
     
     Also, detect the language style of the input:
     - ENGLISH: If the input is primarily standard English (e.g., "I want to schedule a pickup", "what is the price").
@@ -32,7 +33,7 @@ def classify_intent(user_text: str) -> tuple[str, str]:
 
     # Enforce strict JSON output matching our schema
     response = client.models.generate_content(
-        model="gemini-2.5-flash",
+        model="gemini-flash-latest",
         contents=prompt,
         config=types.GenerateContentConfig(
             response_mime_type="application/json",
@@ -41,7 +42,7 @@ def classify_intent(user_text: str) -> tuple[str, str]:
                 "properties": {
                     "intent": {
                         "type": "string",
-                        "enum": ["INTENT_PICKUP", "INTENT_STATUS", "INTENT_PRICING", "INTENT_HUMAN"]
+                        "enum": ["INTENT_PICKUP", "INTENT_STATUS", "INTENT_PRICING", "INTENT_GREETING", "INTENT_QA"]
                     },
                     "detected_language": {
                         "type": "string",
@@ -63,22 +64,27 @@ def classify_intent(user_text: str) -> tuple[str, str]:
 
 def generate_estimate(user_text: str, language: str = "ENGLISH") -> dict:
     """Uses Gemini to match the user's clothes to the catalog across all services, then uses Python for perfectly accurate math."""
-    # Load price list
-    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-    file_path = os.path.join(base_dir, "price_list.json")
-    try:
-        with open(file_path, "r") as f:
-            price_list = json.load(f)
-    except Exception:
-        return {"is_question": False, "reply": "", "total_items_count": 0, "base_estimate": 0.0, "identified_services": ["Dry Clean"], "garments": []}
+    from app.core.database import SessionLocal
+    from app.models.schemas import CatalogItem
 
     all_valid_items = {}
     catalog_summary = {}
     
-    for category_key, category_data in price_list.get("services", {}).items():
-        items_dict = {item["item_name"]: item["base_price"] for item in category_data.get("items", [])}
-        all_valid_items[category_key] = items_dict
-        catalog_summary[category_key] = list(items_dict.keys())
+    db = SessionLocal()
+    try:
+        items = db.query(CatalogItem).all()
+        for item in items:
+            cat = item.service_type
+            if cat not in all_valid_items:
+                all_valid_items[cat] = {}
+                catalog_summary[cat] = []
+            all_valid_items[cat][item.item_name] = item.price
+            catalog_summary[cat].append(item.item_name)
+    except Exception as e:
+        print(f"Error querying catalog_items in generate_estimate: {e}")
+        return {"is_question": False, "reply": "", "total_items_count": 0, "base_estimate": 0.0, "identified_services": ["Dry Clean"], "garments": []}
+    finally:
+        db.close()
 
     prompt = f"""
     You are an AI assistant for Ashirwad Cleaners.
@@ -102,7 +108,7 @@ def generate_estimate(user_text: str, language: str = "ENGLISH") -> dict:
     """
 
     response = client.models.generate_content(
-        model="gemini-2.5-flash",
+        model="gemini-flash-latest",
         contents=prompt,
         config=types.GenerateContentConfig(
             response_mime_type="application/json",

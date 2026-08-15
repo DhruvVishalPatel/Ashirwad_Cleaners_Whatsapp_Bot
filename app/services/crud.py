@@ -90,9 +90,18 @@ def add_points_transaction(db: Session, customer_id: int, points: int, transacti
     db.commit()
 
 def create_order(db: Session, customer_id: int, item_count: int, order_type: str = "PICKUP", service_category: str = None, flat_address: str = None, estimated_amount: float = None, delivery_fee: float = 0.0, points_redeemed: int = 0, special_instructions: str = None, disclaimer_accepted: bool = True, garments_list: list = None):
-    # Generate ID based on row count
-    count = db.query(Order).count()
-    order_id = f"AC-{1001 + count}"
+    # Generate sequential ID based on maximum existing ID
+    max_num = 1000
+    existing_ids = db.query(Order.order_id).all()
+    for (o_id,) in existing_ids:
+        if o_id.startswith("AC-"):
+            try:
+                num = int(o_id.split("-")[1])
+                if num > max_num:
+                    max_num = num
+            except ValueError:
+                pass
+    order_id = f"AC-{max_num + 1}"
     
     db_order = Order(
         order_id=order_id,

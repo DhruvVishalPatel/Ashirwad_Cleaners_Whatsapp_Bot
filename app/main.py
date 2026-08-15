@@ -2,6 +2,7 @@ import os
 import traceback
 from fastapi import FastAPI, Request, BackgroundTasks, HTTPException
 from fastapi.responses import PlainTextResponse
+from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 
 from app.core.database import SessionLocal, init_db
@@ -13,6 +14,7 @@ from app.core.graph import compiled_graph
 load_dotenv()
 
 app = FastAPI(title="Ashirwad Cleaners Agent API")
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 VERIFY_TOKEN = os.environ.get("VERIFY_TOKEN", "YOUR_CUSTOM_VERIFY_TOKEN")
 
@@ -88,7 +90,9 @@ def process_whatsapp_message(payload: dict):
                 "garments_list": [],
                 "item_count": 0,
                 "points_redeemed": 0,
-                "saved_address": ""
+                "saved_address": "",
+                "pending_items_input": "",
+                "direct_order_prefix": ""
             }
             
         # Update text input and run graph

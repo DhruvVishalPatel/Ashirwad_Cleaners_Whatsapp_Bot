@@ -7,11 +7,34 @@ load_dotenv()
 
 # We can import directly from our app modules since dashboard.py is at the root
 from app.core.database import SessionLocal
-from app.models.schemas import Order, OrderStatus, PaymentStatus, Customer, OrderType, Runner
+from app.models.schemas import Order, OrderStatus, PaymentStatus, Customer, OrderType, Runner, OrderItem, CatalogItem
 from app.services.whatsapp_sender import send_text_message
-from app.services.crud import create_customer, create_order, get_customer, get_runners, create_runner, update_customer_name, get_available_points
+from app.services.crud import create_customer, create_order, get_customer, get_runners, create_runner, update_customer_name, get_available_points, get_monthly_order_count
+
+def format_wa_phone(phone: str) -> str:
+    # Strip all non-digit characters
+    digits = "".join([c for c in phone if c.isdigit()])
+    # If it is exactly 10 digits, prefix it with Indian country code '91'
+    if len(digits) == 10:
+        return f"91{digits}"
+    # If it is 12 digits starting with '91', return it
+    if len(digits) == 12 and digits.startswith("91"):
+        return digits
+    return digits
+
+import hashlib
 
 st.set_page_config(page_title="Ashirwad Cleaners Admin", layout="wide")
+
+def get_expected_token() -> str:
+    env_user = os.getenv("ADMIN_USERNAME", "admin")
+    env_pass = os.getenv("ADMIN_PASSWORD", "ashirwad123")
+    return hashlib.sha256(f"{env_user}:{env_pass}".encode()).hexdigest()
+
+# Persistent session recovery via URL query params
+expected_token = get_expected_token()
+if "auth" in st.query_params and st.query_params["auth"] == expected_token:
+    st.session_state.logged_in = True
 
 # ----- ADMIN AUTHENTICATION SECURITY -----
 if "logged_in" not in st.session_state:
@@ -27,6 +50,7 @@ def check_login():
     if username == env_user and password == env_pass:
         st.session_state.logged_in = True
         st.session_state.login_error = False
+        st.query_params["auth"] = expected_token
     else:
         st.session_state.logged_in = False
         st.session_state.login_error = True
@@ -46,6 +70,14 @@ if not st.session_state.logged_in:
             
         st.button("Log In", on_click=check_login, use_container_width=True)
     st.stop()
+
+# Sidebar for logout controls
+with st.sidebar:
+    st.markdown("### 🧺 Session Control")
+    if st.button("🚪 Log Out", use_container_width=True):
+        st.query_params.clear()
+        st.session_state.logged_in = False
+        st.rerun()
 
 st.title("🧺 Ashirwad Cleaners: Admin Dashboard")
 
@@ -116,7 +148,7 @@ with st.sidebar:
 """
 
 # ----- TABS -----
-tab1, tab2, tab3 = st.tabs(["📋 Active Orders", "👥 Customer Database", "⚙️ Staff Settings"])
+tab1, tab2, tab3, tab4 = st.tabs(["📋 Active Orders", "👥 Customer Database", "⚙️ Staff Settings", "🏷️ Price Catalog Manager"])
 
 def load_active_orders(show_all=False):
     if show_all:
@@ -184,6 +216,138 @@ with tab1:
             else:
                 st.markdown("*(No itemized breakdown available for this order)*")
                 
+        with st.expander("✏️ Edit Order Items & Address"):
+            new_address = st.text_input("Address", value=order.flat_address or "")
+            new_instructions = st.text_area("Special Instructions", value=order.special_instructions or "")
+            
+            st.markdown("##### Garments Breakdown")
+            
+            # Fetch all catalog items to populate dropdown options
+            catalog_items = db.query(CatalogItem).all()
+            all_garments = sorted(list(set([item.item_name for item in catalog_items])))
+            if not all_garments:
+                all_garments = ["Shirt", "Pant", "Saree", "Suit", "Blanket"] # Fallback if empty
+            
+            # Keep trace of current items in session state so user can add/delete rows dynamically
+            session_key = f"items_{order.order_id}"
+            if session_key not in st.session_state:
+                st.session_state[session_key] = [
+                    {
+                        "garment_type": oi.garment_type,
+                        "service_type": oi.service_type,
+                        "quantity": oi.quantity
+                    }
+                    for oi in order.items
+                ]
+            
+            current_items = st.session_state[session_key]
+            
+            updated_items = []
+            for idx, item in enumerate(current_items):
+                col_s, col_g, col_q, col_d = st.columns([3, 3, 2, 1])
+                with col_s:
+                    services_list = ["Dry Clean", "Washing", "Steam Press", "Petrol Wash"]
+                    display_service_map = {
+                        "dry_clean": "Dry Clean",
+                        "washing": "Washing",
+                        "steam_press": "Steam Press",
+                        "petrol_wash": "Petrol Wash"
+                    }
+                    code_service_map = {v: k for k, v in display_service_map.items()}
+                    current_disp = display_service_map.get(item["service_type"], "Dry Clean")
+                    s_idx = services_list.index(current_disp) if current_disp in services_list else 0
+                    s_disp = st.selectbox(f"Service #{idx+1}", services_list, index=s_idx, key=f"s_{order.order_id}_{idx}")
+                    s_type = code_service_map[s_disp]
+                    
+                with col_g:
+                    # Filter garments by the selected service category
+                    service_garments = sorted(list(set([c_item.item_name for c_item in catalog_items if c_item.service_type == s_type])))
+                    if not service_garments:
+                        service_garments = ["No items in this category"]
+                        g_type = service_garments[0]
+                        st.selectbox(f"Garment #{idx+1}", service_garments, index=0, disabled=True, key=f"g_{order.order_id}_{idx}")
+                    else:
+                        g_idx = service_garments.index(item["garment_type"]) if item["garment_type"] in service_garments else 0
+                        g_type = st.selectbox(f"Garment #{idx+1}", service_garments, index=g_idx, key=f"g_{order.order_id}_{idx}")
+                        
+                with col_q:
+                    qty = st.number_input(f"Qty #{idx+1}", min_value=1, value=int(item["quantity"]), key=f"q_{order.order_id}_{idx}")
+                with col_d:
+                    st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
+                    delete_row = st.checkbox("🗑️", key=f"del_{order.order_id}_{idx}")
+                
+                if not delete_row and g_type != "No items in this category":
+                    updated_items.append({
+                        "garment_type": g_type,
+                        "service_type": s_type,
+                        "quantity": qty
+                    })
+            
+            col_add, col_save = st.columns(2)
+            with col_add:
+                if st.button("➕ Add Item Row"):
+                    default_service = "dry_clean"
+                    default_garments = sorted(list(set([c_item.item_name for c_item in catalog_items if c_item.service_type == default_service])))
+                    if not default_garments:
+                        for s_key in ["washing", "steam_press", "petrol_wash"]:
+                            default_garments = sorted(list(set([c_item.item_name for c_item in catalog_items if c_item.service_type == s_key])))
+                            if default_garments:
+                                default_service = s_key
+                                break
+                    current_items.append({
+                        "garment_type": default_garments[0] if default_garments else "Shirt",
+                        "service_type": default_service,
+                        "quantity": 1
+                    })
+                    st.session_state[session_key] = current_items
+                    st.rerun()
+            with col_save:
+                if st.button("💾 Save Order Changes"):
+                    order.flat_address = new_address
+                    order.special_instructions = new_instructions
+                    
+                    db.query(OrderItem).filter(OrderItem.order_id == order.order_id).delete()
+                    
+                    total_qty = 0
+                    estimated_sum = 0.0
+                    services_used = set()
+                    
+                    price_lookup = {}
+                    for c_item in catalog_items:
+                        price_lookup[(c_item.service_type, c_item.item_name)] = c_item.price
+                    
+                    for u_item in updated_items:
+                        oi = OrderItem(
+                            order_id=order.order_id,
+                            garment_type=u_item["garment_type"],
+                            service_type=u_item["service_type"],
+                            quantity=u_item["quantity"]
+                        )
+                        db.add(oi)
+                        
+                        total_qty += u_item["quantity"]
+                        services_used.add(u_item["service_type"].replace("_", " ").title())
+                        
+                        item_price = price_lookup.get((u_item["service_type"], u_item["garment_type"]), 50.0)
+                        estimated_sum += (item_price * u_item["quantity"])
+                    
+                    order.item_count = total_qty
+                    order.estimated_amount = estimated_sum
+                    order.service_category = ", ".join(list(services_used)) if services_used else "Dry Clean"
+                    
+                    # Recalculate Delivery Fee
+                    monthly_orders = get_monthly_order_count(db, order.customer_id)
+                    if monthly_orders >= 4:
+                        order.delivery_fee = 0.0
+                    else:
+                        order.delivery_fee = 30.0
+                    
+                    db.commit()
+                    if session_key in st.session_state:
+                        del st.session_state[session_key]
+                    st.success("Order changes saved successfully!")
+                    st.rerun()
+                    
         col1, col2, col3 = st.columns(3)
         
         with col1:
@@ -416,17 +580,210 @@ with tab2:
 
 with tab3:
     st.header("🛵 Manage Delivery Staff")
-    st.markdown("Add runners who will receive dispatch notifications.")
+    st.markdown("View, edit, or add delivery staff runners.")
+    
+    # 1. Fetch and display existing runners in an editable grid
+    runners = get_runners(db)
+    if not runners:
+        st.info("No runners currently registered.")
+    else:
+        st.subheader("Existing Staff Members")
+        runner_data = []
+        for r in runners:
+            runner_data.append({
+                "Runner ID": r.runner_id,
+                "Name": r.name,
+                "WhatsApp Phone": r.phone_number
+            })
+        runner_df = pd.DataFrame(runner_data)
+        
+        edited_runner_df = st.data_editor(
+            runner_df,
+            column_config={
+                "Runner ID": st.column_config.NumberColumn("Runner ID", disabled=True),
+                "Name": st.column_config.TextColumn("Runner Name"),
+                "WhatsApp Phone": st.column_config.TextColumn("WhatsApp Phone")
+            },
+            hide_index=True,
+            use_container_width=True,
+            key="runner_editor"
+        )
+        
+        col_r_save, _ = st.columns([1, 4])
+        with col_r_save:
+            if st.button("Save Staff Changes"):
+                runner_changes = False
+                for index, row in edited_runner_df.iterrows():
+                    r_id = row["Runner ID"]
+                    db_runner = db.query(Runner).filter(Runner.runner_id == r_id).first()
+                    if db_runner:
+                        formatted_phone = format_wa_phone(row["WhatsApp Phone"])
+                        if db_runner.name != row["Name"]:
+                            db_runner.name = row["Name"]
+                            runner_changes = True
+                        if db_runner.phone_number != formatted_phone:
+                            db_runner.phone_number = formatted_phone
+                            runner_changes = True
+                
+                if runner_changes:
+                    db.commit()
+                    st.success("Runner staff details updated successfully!")
+                    st.rerun()
+                    
+        st.markdown("---")
+        
+        # Delete Runner option
+        st.subheader("🗑️ Delete Staff Member")
+        delete_options = {f"{r.name} ({r.phone_number})": r.runner_id for r in runners}
+        runner_to_delete = st.selectbox("Select staff member to remove", list(delete_options.keys()))
+        if st.button("Delete Staff Member"):
+            del_runner_id = delete_options[runner_to_delete]
+            db.query(Runner).filter(Runner.runner_id == del_runner_id).delete()
+            db.commit()
+            st.success("Successfully removed runner!")
+            st.rerun()
+            
+        st.markdown("---")
+
+    # 2. Form to Add a New Runner
+    st.subheader("➕ Register New Staff Member")
     with st.form("runner_entry_form"):
         r_name = st.text_input("Runner Name")
-        r_phone = st.text_input("Runner WhatsApp Phone")
+        r_phone = st.text_input("Runner WhatsApp Phone (e.g. 9377718648)")
         r_submit = st.form_submit_button("Save Runner")
         if r_submit:
             if r_name and r_phone:
+                formatted_phone = format_wa_phone(r_phone)
                 from app.services.crud import create_runner
-                create_runner(db, r_name, r_phone)
+                create_runner(db, r_name, formatted_phone)
                 st.success(f"Runner {r_name} saved!")
+                st.rerun()
             else:
                 st.error("Name and Phone required.")
+
+with tab4:
+    st.header("🏷️ Price Catalog Manager")
+    st.markdown("Manage global services and garment base prices dynamically.")
+    
+    # 1. Selector for Category
+    categories = {
+        "Dry Clean": "dry_clean",
+        "Washing": "washing",
+        "Steam Press": "steam_press",
+        "Petrol Wash": "petrol_wash"
+    }
+    selected_category_label = st.selectbox("Select Service Category to Manage", list(categories.keys()))
+    service_key = categories[selected_category_label]
+    
+    # Query items for this category
+    catalog_items = db.query(CatalogItem).filter(CatalogItem.service_type == service_key).all()
+    
+    # 2. Render editable grid
+    if not catalog_items:
+        st.info(f"No catalog items currently in '{selected_category_label}' category.")
+        cat_df = pd.DataFrame(columns=["ID", "Garment Name", "Price (₹)", "Variable Price", "Note"])
+    else:
+        grid_data = []
+        for item in catalog_items:
+            grid_data.append({
+                "ID": item.id,
+                "Garment Name": item.item_name,
+                "Price (₹)": float(item.price),
+                "Variable Price": bool(item.is_variable),
+                "Note": item.note or ""
+            })
+        cat_df = pd.DataFrame(grid_data)
+        
+    edited_cat_df = st.data_editor(
+        cat_df,
+        column_config={
+            "ID": st.column_config.NumberColumn("ID", disabled=True),
+            "Garment Name": st.column_config.TextColumn("Garment Name"),
+            "Price (₹)": st.column_config.NumberColumn("Price (₹)"),
+            "Variable Price": st.column_config.CheckboxColumn("Variable Price"),
+            "Note": st.column_config.TextColumn("Note")
+        },
+        hide_index=True,
+        use_container_width=True,
+        key=f"catalog_editor_{service_key}"
+    )
+    
+    # Save Grid edits
+    col_g_save, _ = st.columns([1, 4])
+    with col_g_save:
+        if st.button("Save Grid Changes", key=f"save_grid_{service_key}"):
+            grid_changes = False
+            for index, row in edited_cat_df.iterrows():
+                orig_row = cat_df.loc[index]
+                item_id = row["ID"]
+                db_item = db.query(CatalogItem).filter(CatalogItem.id == item_id).first()
+                
+                if db_item:
+                    if db_item.item_name != row["Garment Name"]:
+                        db_item.item_name = row["Garment Name"]
+                        grid_changes = True
+                    if db_item.price != row["Price (₹)"]:
+                        db_item.price = row["Price (₹)"]
+                        grid_changes = True
+                    if db_item.is_variable != row["Variable Price"]:
+                        db_item.is_variable = row["Variable Price"]
+                        grid_changes = True
+                    if db_item.note != row["Note"]:
+                        db_item.note = row["Note"]
+                        grid_changes = True
+            
+            if grid_changes:
+                db.commit()
+                st.success("Catalog grid changes saved successfully!")
+                st.rerun()
+                
+    st.markdown("---")
+    
+    # 3. Form to Add a New Item to this category
+    st.subheader(f"➕ Add New Garment to {selected_category_label}")
+    with st.form(f"add_catalog_item_form_{service_key}"):
+        col_name, col_price, col_var, col_note = st.columns([3, 2, 2, 4])
+        with col_name:
+            new_item_name = st.text_input("Garment Name (e.g. Saree, Suit, Coat)")
+        with col_price:
+            new_item_price = st.number_input("Base Price (₹)", min_value=0.0, value=50.0, step=5.0)
+        with col_var:
+            st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
+            new_item_var = st.checkbox("Variable Price")
+        with col_note:
+            new_item_note = st.text_input("Special Notes / Price Range (e.g. Range 80-200 by size)")
+            
+        submitted = st.form_submit_button("Add Item to Catalog")
+        if submitted:
+            if not new_item_name:
+                st.error("❌ Garment Name is required.")
+            else:
+                new_db_item = CatalogItem(
+                    service_type=service_key,
+                    item_name=new_item_name.strip(),
+                    price=new_item_price,
+                    is_variable=new_item_var,
+                    note=new_item_note.strip() if new_item_note else None
+                )
+                db.add(new_db_item)
+                db.commit()
+                st.success(f"Successfully added '{new_item_name}' to '{selected_category_label}' catalog!")
+                st.rerun()
+                
+    st.markdown("---")
+    
+    # 4. Remove Item from this category
+    st.subheader(f"🗑️ Delete Garment from {selected_category_label}")
+    if not catalog_items:
+        st.info("No items to delete.")
+    else:
+        delete_options = {item.item_name: item.id for item in catalog_items}
+        item_to_delete = st.selectbox("Select Garment to Delete", list(delete_options.keys()))
+        if st.button("Delete Item from Catalog", key=f"del_cat_{service_key}"):
+            del_id = delete_options[item_to_delete]
+            db.query(CatalogItem).filter(CatalogItem.id == del_id).delete()
+            db.commit()
+            st.success(f"Successfully deleted '{item_to_delete}' from catalog!")
+            st.rerun()
 
 db.close()

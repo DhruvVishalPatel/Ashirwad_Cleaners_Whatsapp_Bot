@@ -5,9 +5,34 @@ TRANSLATIONS = {
         "GUJLISH": "🎉 *Loyalty Bonus*: Kem ke aa aapno aa mahina no 5th+ order che, aapni ₹30 Delivery Fee maf che!\n\n"
     },
     "WELCOME_MSG": {
-        "ENGLISH": "🙏 Namaste! Welcome to Ashirwad Cleaners.\nWe are here to take care of your favorite garments—from daily wear to heavy festive sarees, sherwanis, and household blankets. \nHow can we help you today? Please choose an option below:",
-        "HINGLISH": "🙏 Namaste! Ashirwad Cleaners mein aapka swagat hai.\nHum aapke pasandida kapdo ki dekhbhal ke liye taiyar hain—daily wear se lekar heavy festive sarees, sherwanis, aur blankets tak.\nHum aaj aapki kya madad kar sakte hain? Kripya neeche diye gaye option ko select karein:",
-        "GUJLISH": "🙏 Namaste! Ashirwad Cleaners ma aapnu swagat che.\nAme aapna manpasand kapda ni dekhbhal karva mate taiyar chhiye—daily wear thi laine heavy festive sarees, sherwanis, ane blankets sudhi.\nAme aaj aapni su madad kari shakiye? Kripa kari ne niche aapel options mathi pasand karo:"
+        "ENGLISH": "🙏 Namaste! Welcome to Ashirwad Cleaners.\nWe are here to take care of your favorite garments—from daily wear to heavy festive sarees, sherwanis, and household blankets.\n\nHow can we help you today? Please choose an option below, or feel free to type any query you have:",
+        "HINGLISH": "🙏 Namaste! Ashirwad Cleaners mein aapka swagat hai.\nHum aapke pasandida kapdo ki dekhbhal ke liye taiyar hain—daily wear se lekar heavy festive sarees, sherwanis, aur blankets tak.\n\nHum aaj aapki kya madad kar sakte hain? Kripya neeche diye gaye option ko select karein, ya aap koi bhi query type karke pooch sakte hain:",
+        "GUJLISH": "🙏 Namaste! Ashirwad Cleaners ma aapnu swagat che.\nAme aapna manpasand kapda ni dekhbhal karva mate taiyar chhiye—daily wear thi laine heavy festive sarees, sherwanis, ane blankets sudhi.\n\nAme aaj aapni su madad kari shakiye? Kripa kari niche aapel options mathi pasand karo, ya tame koi pan query type kari ne puchi shako cho:"
+    },
+    "GREETING_BUTTON_PICKUP": {
+        "ENGLISH": "Schedule Pickup",
+        "HINGLISH": "Pickup / Book",
+        "GUJLISH": "Pickup Book Karo"
+    },
+    "GREETING_BUTTON_PRICING": {
+        "ENGLISH": "Check Pricing",
+        "HINGLISH": "Pricing / Rate List",
+        "GUJLISH": "Bhav / Pricing"
+    },
+    "GREETING_BUTTON_STATUS": {
+        "ENGLISH": "Order Status",
+        "HINGLISH": "Order Status / Track",
+        "GUJLISH": "Order Track Karo"
+    },
+    "WELCOME_BACK_PREFIX": {
+        "ENGLISH": "Welcome back, {name}! Let's process your order:\n\n",
+        "HINGLISH": "Ashirwad Cleaners mein aapka fir se swagat hai, {name}! Hum aapki list check kar rahe hain:\n\n",
+        "GUJLISH": "Ashirwad Cleaners ma aapnu feri swagat che, {name}! Ame aapni list check kari rahya chhiye:\n\n"
+    },
+    "NEW_CUSTOMER_PREFIX": {
+        "ENGLISH": "Nice to meet you, {name}! Let's process your order:\n\n",
+        "HINGLISH": "Aapki details check ho gayi hain, {name}! Hum aapki order list check kar rahe hain:\n\n",
+        "GUJLISH": "Khub saras, {name}! Ame aapni order list check kari rahya chhiye:\n\n"
     },
     "ASK_NAME": {
         "ENGLISH": "Great! We'd love to pick up your clothes. What is your name?",
@@ -33,6 +58,11 @@ TRANSLATIONS = {
         "ENGLISH": "We have three main service categories! Which pricing list would you like to view?",
         "HINGLISH": "Humari teen main service categories hain! Aap kaunsi pricing list dekhna chahenge?",
         "GUJLISH": "Amari tran main service categories che! Tame kain pricing list jova mangso?"
+    },
+    "PRICING_IMAGE_CAPTION": {
+        "ENGLISH": "📋 Here is our complete price list for all services! Feel free to type any query or start a pickup order anytime.",
+        "HINGLISH": "📋 Yeh rahi humari saari services ki complete price list! Aap isey dekh sakte hain. Kisi bhi inquiry ya pickup ke liye aap kabhi bhi message kar sakte hain.",
+        "GUJLISH": "📋 Aa rahi amari badhi services ni complete price list! Tame aa joi shako cho. Koi pan inquiry ya pickup mate tame game tyare message kari shako cho."
     },
     "PRICING_AWAIT_SELECTION_ERROR": {
         "ENGLISH": "Please tap one of the category buttons above.",
