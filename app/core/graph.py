@@ -1,10 +1,11 @@
 import os
 import json
 import re
+import sqlite3
 from typing import TypedDict, List, Dict, Any, Literal
 from langchain_core.messages import BaseMessage
 from langgraph.graph import StateGraph, START, END
-from langgraph.checkpoint.memory import MemorySaver
+from langgraph.checkpoint.sqlite import SqliteSaver
 
 from app.core.database import SessionLocal
 from app.models.schemas import Customer, Order, OrderStatus
@@ -736,6 +737,9 @@ for node in nodes_to_route:
         }
     )
 
-# In-Memory thread checkpointer
-memory = MemorySaver()
+# Persistent SQLite thread checkpointer (shared across all worker processes)
+DB_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+CHECKPOINTS_DB = os.path.join(DB_DIR, "checkpoints.db")
+conn = sqlite3.connect(CHECKPOINTS_DB, check_same_thread=False)
+memory = SqliteSaver(conn)
 compiled_graph = builder.compile(checkpointer=memory)
