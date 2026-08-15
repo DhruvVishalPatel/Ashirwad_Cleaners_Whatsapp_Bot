@@ -11,6 +11,7 @@ from app.models.schemas import Customer, Order, OrderStatus
 from app.services.whatsapp_sender import send_text_message, send_interactive_buttons, send_image_message
 from app.core.translations import t
 from app.core.llm_router import classify_intent, generate_estimate
+from app.core.logger import logger
 from app.services.crud import (
     create_order,
     update_customer_location,
@@ -100,6 +101,8 @@ def classifier_node(state: BotState) -> Dict[str, Any]:
     """
     text = state.get("text_input", "").strip()
     clean_text = text.lower()
+    
+    logger.info(f"[ClassifierNode] Entry. Current Flow: {state.get('current_flow')}, State: {state.get('current_state')}, Input: '{text}'")
     
     # 1. Check Global Reset Keywords
     reset_keywords = ["cancel", "restart", "start over", "reset", "radd", "cancel karo", "shuru se", "radd karo", "chodi do", "fari shuru karo"]
@@ -198,8 +201,10 @@ def classifier_node(state: BotState) -> Dict[str, Any]:
         "INTENT_QA": "QA"
     }
     
+    next_flow = flow_mapping.get(intent, "QA")
+    logger.info(f"[ClassifierNode] Output. Routed to Flow: {next_flow}, Language: {detected_lang}")
     return {
-        "current_flow": flow_mapping.get(intent, "QA"),
+        "current_flow": next_flow,
         "language": detected_lang,
         "response_sent": False
     }
@@ -641,6 +646,7 @@ def route_next_node(state: BotState) -> str:
     """
     flow = state.get("current_flow", "IDLE")
     curr_state = state.get("current_state", "")
+    logger.info(f"[route_next_node] Evaluating routing. Flow: {flow}, State: {curr_state}")
     
     if flow == "GREETING":
         return "greeting"
@@ -672,8 +678,11 @@ def route_after_node(state: BotState) -> str:
     or continue routing within the same turn.
     """
     if state.get("response_sent"):
+        logger.info("[route_after_node] Response sent to user. Terminating graph execution run (END).")
         return END
-    return route_next_node(state)
+    next_node = route_next_node(state)
+    logger.info(f"[route_after_node] Response not sent yet. Routing immediately to next node: '{next_node}'")
+    return next_node
 
 builder = StateGraph(BotState)
 

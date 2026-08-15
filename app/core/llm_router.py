@@ -3,6 +3,7 @@ import json
 from google import genai
 from google.genai import types
 from dotenv import load_dotenv
+from app.core.logger import logger
 
 # Configure API Key (ensure this is loaded from .env in production)
 load_dotenv()
@@ -55,11 +56,14 @@ def classify_intent(user_text: str) -> tuple[str, str]:
     )
     
     try:
-        # The output is guaranteed to be a JSON string matching the schema
         result = json.loads(response.text)
-        return result.get("intent", "INTENT_HUMAN"), result.get("detected_language", "ENGLISH")
-    except Exception:
-        return "INTENT_HUMAN", "ENGLISH"
+        intent = result.get("intent", "INTENT_QA")
+        lang = result.get("detected_language", "ENGLISH")
+        logger.info(f"Classify intent success. Input: '{user_text}' -> Intent: {intent}, Language: {lang}")
+        return intent, lang
+    except Exception as e:
+        logger.error(f"Error classifying intent for input '{user_text}': {e}")
+        return "INTENT_QA", "ENGLISH"
 
 
 def generate_estimate(user_text: str, language: str = "ENGLISH") -> dict:
@@ -173,6 +177,7 @@ def generate_estimate(user_text: str, language: str = "ENGLISH") -> dict:
             
         identified_services = list(services_used) if services_used else ["Dry Clean"]
             
+        logger.info(f"Generate estimate success. Input: '{user_text}' -> IsQuestion: {is_question}, Qty: {total_count}, Est: ₹{total_estimate}, Garments: {garments}")
         return {
             "is_question": is_question,
             "reply": reply,
@@ -182,6 +187,7 @@ def generate_estimate(user_text: str, language: str = "ENGLISH") -> dict:
             "garments": garments
         }
         
-    except Exception:
+    except Exception as e:
+        logger.error(f"Error generating estimate for input '{user_text}': {e}")
         return {"is_question": False, "reply": "", "total_items_count": 0, "base_estimate": 0.0, "identified_services": ["Dry Clean"], "garments": []}
 

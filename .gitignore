@@ -66,3 +66,7 @@ venv.bak/
 
 # Streamlit
 .streamlit/
+
+# Log files
+logs/
+*.log

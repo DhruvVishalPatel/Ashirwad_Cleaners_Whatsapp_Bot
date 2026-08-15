@@ -10,6 +10,7 @@ from app.services.crud import get_customer, create_customer
 from app.core.translations import t
 from app.services.whatsapp_sender import send_text_message
 from app.core.graph import compiled_graph
+from app.core.logger import logger
 
 load_dotenv()
 
@@ -20,7 +21,9 @@ VERIFY_TOKEN = os.environ.get("VERIFY_TOKEN", "YOUR_CUSTOM_VERIFY_TOKEN")
 
 @app.on_event("startup")
 def on_startup():
+    logger.info("Initializing database schema...")
     init_db()
+    logger.info("Database schema initialized successfully.")
 
 def process_whatsapp_message(payload: dict):
     # This runs in the background
@@ -96,12 +99,12 @@ def process_whatsapp_message(payload: dict):
             }
             
         # Update text input and run graph
-        current_state_data["text_input"] = text
+        logger.info(f"Invoking StateGraph for customer_id: {current_state_data.get('customer_id')} with input: '{text}'")
         compiled_graph.invoke(current_state_data, config)
+        logger.info(f"StateGraph invocation finished successfully for customer_id: {current_state_data.get('customer_id')}")
         
     except Exception as e:
-        print(f"Error processing message: {e}")
-        traceback.print_exc()
+        logger.error(f"Error processing message: {e}\n{traceback.format_exc()}")
 
 @app.get("/webhook")
 async def verify_webhook(request: Request):
@@ -111,7 +114,9 @@ async def verify_webhook(request: Request):
     challenge = request.query_params.get("hub.challenge")
 
     if mode == "subscribe" and token == VERIFY_TOKEN:
+        logger.info("Webhook validation ping successful!")
         return PlainTextResponse(challenge, status_code=200)
+    logger.warning("Webhook validation ping failed: Invalid verification token.")
     raise HTTPException(status_code=403, detail="Invalid verification token")
 
 @app.post("/webhook")
@@ -119,8 +124,9 @@ async def receive_webhook(request: Request, background_tasks: BackgroundTasks):
     """Receives inbound messages and instantly returns 200 OK."""
     try:
         payload = await request.json()
+        logger.debug(f"Webhook payload received: {payload}")
         background_tasks.add_task(process_whatsapp_message, payload)
         return {"status": "ok"}
     except Exception as e:
-        print(f"Webhook Error: {e}")
+        logger.error(f"Webhook Endpoint Error: {e}")
         return {"status": "error"}
