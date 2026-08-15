@@ -99,6 +99,7 @@ def process_whatsapp_message(payload: dict):
             }
             
         # Update text input and run graph
+        current_state_data["text_input"] = text
         logger.info(f"Invoking StateGraph for customer_id: {current_state_data.get('customer_id')} with input: '{text}'")
         compiled_graph.invoke(current_state_data, config)
         logger.info(f"StateGraph invocation finished successfully for customer_id: {current_state_data.get('customer_id')}")
