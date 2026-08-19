@@ -131,6 +131,22 @@ def classifier_node(state: BotState) -> Dict[str, Any]:
         # If it is NOT a button/synonym, check if they are asking a Q&A question or backtracking
         intent, detected_lang = classify_intent(text)
         
+        # If user sends a greeting message, break out of the active flow and return to the main menu
+        if intent == "INTENT_GREETING":
+            logger.info(f"[ClassifierNode] Greeting received during active flow '{state['current_flow']}'. Resetting state and returning to main menu.")
+            return {
+                "current_flow": "GREETING",
+                "current_state": "",
+                "last_active_state": "",
+                "garments_list": [],
+                "item_count": 0,
+                "points_redeemed": 0,
+                "saved_address": "",
+                "pending_items_input": "",
+                "direct_order_prefix": "",
+                "response_sent": False
+            }
+            
         # Check Backtracking Modifiers
         if state["current_flow"] == "PICKUP":
             backtrack_items = ["change items", "change clothes", "items badlo", "kapde badlo", "kapda badlo", "incorrect items", "wrong items"]
@@ -164,7 +180,7 @@ def classifier_node(state: BotState) -> Dict[str, Any]:
                 }
                 
         # Check if Q&A interrupt
-        if intent in ["Q&A", "INTENT_PRICING"]:
+        if intent in ["INTENT_QA", "INTENT_PRICING"]:
             return {
                 "language": detected_lang,
                 "current_flow": "QA",
