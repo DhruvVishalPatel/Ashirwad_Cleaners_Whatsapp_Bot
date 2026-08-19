@@ -47,15 +47,16 @@ def process_whatsapp_message(payload: dict):
         if not customer:
             customer = create_customer(db, phone_number)
             
-        lang = customer.preferred_language or "ENGLISH"
-
+        lang = customer.preferred_language or ""
+        lang_for_warning = lang if lang else "ENGLISH"
+ 
         # Working Hours Check
         from datetime import datetime, time
         from zoneinfo import ZoneInfo
         ist = ZoneInfo("Asia/Kolkata")
         now = datetime.now(ist)
         if not (time(9, 0) <= now.time() <= time(20, 30)):
-            send_text_message(phone_number, t("CLOSED_WARNING", lang))
+            send_text_message(phone_number, t("CLOSED_WARNING", lang_for_warning))
             db.close()
             return {"status": "ok"}
         

@@ -105,7 +105,33 @@ def classifier_node(state: BotState) -> Dict[str, Any]:
     
     logger.info(f"[ClassifierNode] Entry. Current Flow: {state.get('current_flow')}, State: {state.get('current_state')}, Input: '{text}'")
     
-    # 1. Check Global Reset Keywords
+    # 2. Check for explicit Language Selection Buttons
+    if text.startswith("btn_lang_"):
+        lang_map = {
+            "btn_lang_english": "ENGLISH",
+            "btn_lang_hinglish": "HINGLISH",
+            "btn_lang_gujlish": "GUJLISH"
+        }
+        selected_lang = lang_map.get(text, "ENGLISH")
+        
+        # Persist preferred language choice in Database
+        db = SessionLocal()
+        customer = db.query(Customer).filter(Customer.customer_id == state["customer_id"]).first()
+        if customer:
+            customer.preferred_language = selected_lang
+            db.commit()
+        db.close()
+        
+        logger.info(f"[ClassifierNode] Language selected: {selected_lang}. Routing to GREETING flow.")
+        return {
+            "current_flow": "GREETING",
+            "current_state": "",
+            "last_active_state": "",
+            "language": selected_lang,
+            "response_sent": False
+        }
+
+    # 3. Check Global Reset Keywords
     reset_keywords = ["cancel", "restart", "start over", "reset", "radd", "cancel karo", "shuru se", "radd karo", "chodi do", "fari shuru karo"]
     if clean_text in reset_keywords:
         send_text_message(state["phone_number"], t("SESSION_CANCELLED", state["language"]))
@@ -115,8 +141,18 @@ def classifier_node(state: BotState) -> Dict[str, Any]:
             "last_active_state": "",
             "response_sent": True
         }
+
+    # 4. Check if Language is unspecified
+    if not state.get("language") or state.get("language") not in ["ENGLISH", "HINGLISH", "GUJLISH"]:
+        logger.info("[ClassifierNode] Unspecified language. Redirecting to CHANGE_LANGUAGE flow.")
+        return {
+            "current_flow": "CHANGE_LANGUAGE",
+            "current_state": "",
+            "last_active_state": "",
+            "response_sent": False
+        }
         
-    # 2. Check if in active flow
+    # 5. Check if in active flow
     if state["current_flow"] != "IDLE":
         # Check if they clicked a button directly
         if text.startswith("btn_"):
@@ -179,6 +215,22 @@ def classifier_node(state: BotState) -> Dict[str, Any]:
                     "response_sent": True
                 }
                 
+        # Check if change language request
+        if intent == "INTENT_CHANGE_LANGUAGE":
+            logger.info(f"[ClassifierNode] Change language requested during active flow '{state['current_flow']}'. Resetting state.")
+            return {
+                "current_flow": "CHANGE_LANGUAGE",
+                "current_state": "",
+                "last_active_state": "",
+                "garments_list": [],
+                "item_count": 0,
+                "points_redeemed": 0,
+                "saved_address": "",
+                "pending_items_input": "",
+                "direct_order_prefix": "",
+                "response_sent": False
+            }
+
         # Check if Q&A interrupt
         if intent in ["INTENT_QA", "INTENT_PRICING"]:
             return {
@@ -202,20 +254,22 @@ def classifier_node(state: BotState) -> Dict[str, Any]:
     else:
         intent, detected_lang = classify_intent(text)
         
-    # Save detected language to customer record in database
-    db = SessionLocal()
-    customer = db.query(Customer).filter(Customer.customer_id == state["customer_id"]).first()
-    if customer:
-        customer.preferred_language = detected_lang
-        db.commit()
-    db.close()
+    # Save detected language to customer record in database (only if it is not empty)
+    if detected_lang:
+        db = SessionLocal()
+        customer = db.query(Customer).filter(Customer.customer_id == state["customer_id"]).first()
+        if customer:
+            customer.preferred_language = detected_lang
+            db.commit()
+        db.close()
     
     flow_mapping = {
         "INTENT_PICKUP": "PICKUP",
         "INTENT_STATUS": "STATUS",
         "INTENT_PRICING": "PRICING",
         "INTENT_GREETING": "GREETING",
-        "INTENT_QA": "QA"
+        "INTENT_QA": "QA",
+        "INTENT_CHANGE_LANGUAGE": "CHANGE_LANGUAGE"
     }
     
     next_flow = flow_mapping.get(intent, "QA")
@@ -596,6 +650,24 @@ def pricing_node(state: BotState) -> Dict[str, Any]:
         "response_sent": True
     }
 
+def change_language_node(state: BotState) -> Dict[str, Any]:
+    """
+    Prompts the user to select their preferred language.
+    """
+    buttons = [
+        {"id": "btn_lang_english", "title": "English"},
+        {"id": "btn_lang_hinglish", "title": "Hindi (Hinglish)"},
+        {"id": "btn_lang_gujlish", "title": "Gujarati (Gujlish)"}
+    ]
+    # Default to ENGLISH so t() outputs the combined multi-lingual text
+    send_interactive_buttons(state["phone_number"], t("ASK_LANGUAGE", "ENGLISH"), buttons)
+    
+    return {
+        "current_flow": "IDLE",
+        "current_state": "AWAITING_LANGUAGE_SELECTION",
+        "response_sent": True
+    }
+
 def status_node(state: BotState) -> Dict[str, Any]:
     """
     Shows status of user's active orders.
@@ -673,6 +745,8 @@ def route_next_node(state: BotState) -> str:
         return "pricing"
     elif flow == "QA":
         return "qa"
+    elif flow == "CHANGE_LANGUAGE":
+        return "change_language"
     elif flow == "PICKUP":
         if not curr_state or curr_state == "INTENT_PICKUP":
             return "pickup_name"
@@ -713,6 +787,7 @@ builder.add_node("pickup_address", pickup_address_node)
 builder.add_node("pricing", pricing_node)
 builder.add_node("status", status_node)
 builder.add_node("qa", qa_node)
+builder.add_node("change_language", change_language_node)
 
 # Add Edges
 builder.add_edge(START, "classifier")
@@ -726,6 +801,7 @@ builder.add_conditional_edges(
         "status": "status",
         "pricing": "pricing",
         "qa": "qa",
+        "change_language": "change_language",
         "pickup_name": "pickup_name",
         "pickup_items": "pickup_items",
         "pickup_points": "pickup_points",
@@ -735,7 +811,7 @@ builder.add_conditional_edges(
 )
 
 # Conditional Router Edges from All Flow Nodes
-nodes_to_route = ["greeting", "pickup_name", "pickup_items", "pickup_points", "pickup_address", "pricing", "status", "qa"]
+nodes_to_route = ["greeting", "pickup_name", "pickup_items", "pickup_points", "pickup_address", "pricing", "status", "qa", "change_language"]
 for node in nodes_to_route:
     builder.add_conditional_edges(
         node,
@@ -745,6 +821,7 @@ for node in nodes_to_route:
             "status": "status",
             "pricing": "pricing",
             "qa": "qa",
+            "change_language": "change_language",
             "pickup_name": "pickup_name",
             "pickup_items": "pickup_items",
             "pickup_points": "pickup_points",

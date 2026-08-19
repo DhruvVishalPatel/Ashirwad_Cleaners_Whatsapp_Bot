@@ -1,4 +1,9 @@
 TRANSLATIONS = {
+    "ASK_LANGUAGE": {
+        "ENGLISH": "🙏 Welcome to Ashirwad Cleaners!\nPlease select your preferred language to continue:\n\nAshirwad Cleaners mein aapka swagat hai! Kripya apni bhasha chunein:\n\nAshirwad Cleaners ma aapnu swagat che! Kripa kari aapni bhasha pasand karo:",
+        "HINGLISH": "🙏 Welcome to Ashirwad Cleaners!\nPlease select your preferred language to continue:\n\nAshirwad Cleaners mein aapka swagat hai! Kripya apni bhasha chunein:\n\nAshirwad Cleaners ma aapnu swagat che! Kripa kari aapni bhasha pasand karo:",
+        "GUJLISH": "🙏 Welcome to Ashirwad Cleaners!\nPlease select your preferred language to continue:\n\nAshirwad Cleaners mein aapka swagat hai! Kripya apni bhasha chunein:\n\nAshirwad Cleaners ma aapnu swagat che! Kripa kari aapni bhasha pasand karo:"
+    },
     "LOYALTY_BONUS_PROMO": {
         "ENGLISH": "🎉 *Loyalty Bonus*: Since this is your 5th+ order this month, your ₹30 Delivery Fee is completely waived!\n\n",
         "HINGLISH": "🎉 *Loyalty Bonus*: Kyunki yeh aapka is mahine ka 5th+ order hai, aapki ₹30 Delivery Fee maaf hai!\n\n",
