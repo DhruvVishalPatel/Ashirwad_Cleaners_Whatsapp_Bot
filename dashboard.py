@@ -79,7 +79,33 @@ with st.sidebar:
         st.session_state.logged_in = False
         st.rerun()
 
-st.title("🧺 Ashirwad Cleaners: Admin Dashboard")
+col_title, col_ref = st.columns([4, 1])
+with col_title:
+    st.title("🧺 Ashirwad Cleaners: Admin Dashboard")
+with col_ref:
+    st.markdown("<div style='height: 18px;'></div>", unsafe_allow_html=True)
+    if st.button("🔄 Refresh Data", use_container_width=True):
+        st.rerun()
+
+# JS Injector to trigger the refresh button click silently every 15 seconds
+import streamlit.components.v1 as components
+components.html(
+    """
+    <script>
+        const clickRefresh = () => {
+            const doc = window.parent.document;
+            const buttons = Array.from(doc.querySelectorAll('button'));
+            const refreshBtn = buttons.find(el => el.innerText && el.innerText.includes('Refresh Data'));
+            if (refreshBtn) {
+                refreshBtn.click();
+            }
+        };
+        // Trigger auto-refresh every 15 seconds
+        setInterval(clickRefresh, 15000);
+    </script>
+    """,
+    height=0
+)
 
 # Initialize database session
 db = SessionLocal()
