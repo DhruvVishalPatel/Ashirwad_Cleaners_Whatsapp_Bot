@@ -62,6 +62,8 @@ venv.bak/
 
 # Databases
 *.db
+*.db-shm
+*.db-wal
 *.sqlite3
 
 # Streamlit
