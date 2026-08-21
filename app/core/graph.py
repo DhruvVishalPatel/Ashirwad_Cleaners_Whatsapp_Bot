@@ -309,6 +309,14 @@ def pickup_name_node(state: BotState) -> Dict[str, Any]:
     is_direct_order = not (clean_input in ["pickup", "btn_intent_pickup", "order", "book", "laundry", "dry clean", "steam press"])
     
     if state.get("current_state") == "PICKUP_AWAITING_NAME":
+        if input_text.startswith("btn_"):
+            # Ignore button click payloads and ask for name text again
+            send_text_message(state["phone_number"], t("ASK_NAME", lang))
+            return {
+                "current_state": "PICKUP_AWAITING_NAME",
+                "response_sent": True
+            }
+            
         # Process the name input
         name = input_text
         db = SessionLocal()
