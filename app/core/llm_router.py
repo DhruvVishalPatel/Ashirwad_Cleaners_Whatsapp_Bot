@@ -107,6 +107,7 @@ def generate_estimate(user_text: str, language: str = "ENGLISH") -> dict:
     4. Normalize each garment strictly to one of the valid item names in the chosen category. Handle synonyms (e.g., 'jeans' -> 'Pant').
     5. If an item cannot be matched at all, just return it as 'Unknown'.
     6. If the user is trying to request a pickup but their request is too vague (e.g., they just say "laundry", "laundry karvana hai", "laundry dhoni hai", "laundry no order apo" without specifying counts or garment types), set 'is_question_or_conversational' to true, keep 'garments' empty, and write a polite 'conversational_reply' in {language} (using Latin script) asking them to specify the clothes and services (e.g. "Kripya apne kapde aur unki service list karein, jaise: 2 shirts for washing, 1 saree for dry clean").
+    7. CRITICAL FOR ADDITIONS / REMOVALS / MODIFICATIONS: If the customer is adding, removing, or updating garments (e.g., "remove 4 pants from wash", "add 2 shirts", "nikal do 1 saree", "remove 1 shirt", "add 3 pants"), you MUST extract those garments and their quantities into the 'garments' array! Do NOT set 'is_question_or_conversational' to true for garment additions or removals.
     
     Output ONLY valid JSON matching the schema. Do not do any math.
     """

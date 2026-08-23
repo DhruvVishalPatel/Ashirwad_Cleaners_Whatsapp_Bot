@@ -146,25 +146,26 @@ def classifier_node(state: BotState) -> Dict[str, Any]:
                 "change clothes" in clean_text or "items badlo" in clean_text or "kapde badlo" in clean_text
             )
             
+            user_lang = state.get("language") if state.get("language") in ["ENGLISH", "HINGLISH", "GUJLISH"] else detected_lang
             if is_item_modification or (intent == "INTENT_PICKUP" and state.get("current_state") in ["PICKUP_AWAITING_POINTS_REDEEM", "PICKUP_AWAITING_ADDRESS_BUTTON", "PICKUP_AWAITING_CONFIRMATION_ADDRESS"]):
                 return {
-                    "language": detected_lang,
+                    "language": user_lang,
                     "current_state": "PICKUP_AWAITING_ITEMS",
                     "text_input": text,
                     "response_sent": False
                 }
             elif any(kw in clean_text for kw in backtrack_address):
-                send_text_message(state["phone_number"], t("ADDRESS_INPUT_NEW_REQUEST", detected_lang))
+                send_text_message(state["phone_number"], t("ADDRESS_INPUT_NEW_REQUEST", user_lang))
                 return {
-                    "language": detected_lang,
+                    "language": user_lang,
                     "current_state": "PICKUP_AWAITING_CONFIRMATION_ADDRESS",
                     "saved_address": "",
                     "response_sent": True
                 }
             elif any(kw in clean_text for kw in backtrack_name):
-                send_text_message(state["phone_number"], t("ASK_NAME", detected_lang))
+                send_text_message(state["phone_number"], t("ASK_NAME", user_lang))
                 return {
-                    "language": detected_lang,
+                    "language": user_lang,
                     "current_state": "PICKUP_AWAITING_NAME",
                     "customer_name": "",
                     "response_sent": True
@@ -185,9 +186,10 @@ def classifier_node(state: BotState) -> Dict[str, Any]:
                 "response_sent": False
             }
 
+        user_lang = state.get("language") if state.get("language") in ["ENGLISH", "HINGLISH", "GUJLISH"] else detected_lang
         if intent in ["INTENT_QA", "INTENT_PRICING"]:
             return {
-                "language": detected_lang,
+                "language": user_lang,
                 "current_flow": "QA",
                 "last_active_state": state.get("current_state", ""),
                 "response_sent": False
@@ -205,7 +207,8 @@ def classifier_node(state: BotState) -> Dict[str, Any]:
     else:
         intent, detected_lang = classify_intent(text)
         
-    if detected_lang:
+    user_lang = state.get("language") if state.get("language") in ["ENGLISH", "HINGLISH", "GUJLISH"] else detected_lang
+    if not state.get("language") and detected_lang:
         with SessionLocal() as db:
             customer = db.query(Customer).filter(Customer.customer_id == state["customer_id"]).first()
             if customer:
@@ -222,10 +225,10 @@ def classifier_node(state: BotState) -> Dict[str, Any]:
     }
     
     next_flow = flow_mapping.get(intent, "QA")
-    logger.info(f"[ClassifierNode] Output. Routed to Flow: {next_flow}, Language: {detected_lang}")
+    logger.info(f"[ClassifierNode] Output. Routed to Flow: {next_flow}, Language: {user_lang}")
     return {
         "current_flow": next_flow,
-        "language": detected_lang,
+        "language": user_lang,
         "response_sent": False
     }
 
