@@ -107,6 +107,28 @@ components.html(
     height=0
 )
 
+STATUS_HUMAN_MAP = {
+    "PENDING_PICKUP": "Pending Pickup",
+    "PICKED_UP": "Picked Up",
+    "IN_SHOP": "Received at Shop",
+    "PROCESSING": "In Cleaning & Processing",
+    "READY": "Ready for Delivery",
+    "OUT_FOR_DELIVERY": "Out for Delivery",
+    "DELIVERED": "Delivered",
+    "CANCELLED": "Cancelled",
+    "REJECTED": "Rejected"
+}
+
+ORDER_TYPE_HUMAN_MAP = {
+    "PICKUP": "Pickup & Delivery",
+    "STORE_DROP": "Store Drop-off"
+}
+
+PAYMENT_STATUS_HUMAN_MAP = {
+    "UNPAID": "Unpaid",
+    "PAID": "Paid"
+}
+
 with SessionLocal() as db:
     # ----- SCOREBOARD METRICS -----
     st.markdown("### 📊 Live Analytics")
@@ -137,9 +159,13 @@ with SessionLocal() as db:
             raw_est = o.estimated_amount or 0.0
             raw_total = o.total_amount or 0.0
             
+            order_type_str = ORDER_TYPE_HUMAN_MAP.get(o.order_type.name, o.order_type.name.replace("_", " ").title())
+            payment_str = PAYMENT_STATUS_HUMAN_MAP.get(o.payment_status.name, o.payment_status.name.replace("_", " ").title())
+            status_str = STATUS_HUMAN_MAP.get(o.status.name, o.status.name.replace("_", " ").title())
+
             data.append({
                 "Order ID": o.order_id,
-                "Type": o.order_type.name,
+                "Type": order_type_str,
                 "Service(s)": o.service_category or "Dry Clean",
                 "Customer Name": o.customer.name if o.customer and o.customer.name else "Unknown",
                 "Customer Phone": o.customer.phone_number if o.customer else "Unknown",
@@ -147,8 +173,8 @@ with SessionLocal() as db:
                 "GPS Location": o.customer.last_location_gps if o.customer and o.customer.last_location_gps else "N/A",
                 "Items": o.item_count,
                 "Final Total": f"₹{raw_total + delivery_fee - o.points_redeemed}" if o.total_amount else f"₹{raw_est + delivery_fee - o.points_redeemed}",
-                "Payment": o.payment_status.name,
-                "Status": o.status.name
+                "Payment": payment_str,
+                "Status": status_str
             })
         return pd.DataFrame(data), orders
 
@@ -186,7 +212,8 @@ with SessionLocal() as db:
             if order.items:
                 st.markdown("**Itemized Garments:**")
                 for oi in order.items:
-                    st.markdown(f"- {oi.quantity}x {oi.garment_type} ({oi.service_type})")
+                    serv_display = oi.service_type.replace("_", " ").title() if oi.service_type else "Dry Clean"
+                    st.markdown(f"- {oi.quantity}x {oi.garment_type} ({serv_display})")
             else:
                 st.markdown("*(No itemized breakdown available for this order)*")
                 
@@ -349,10 +376,10 @@ with SessionLocal() as db:
         with col2:
             # Update Payment & Order Status
             st.markdown("**Update Status**")
-            new_payment = st.selectbox("Payment Status", [p.name for p in PaymentStatus], index=[p.name for p in PaymentStatus].index(order.payment_status.name))
+            new_payment = st.selectbox("Payment Status", [p.name for p in PaymentStatus], index=[p.name for p in PaymentStatus].index(order.payment_status.name), format_func=lambda p: PAYMENT_STATUS_HUMAN_MAP.get(p, p.replace("_", " ").title()))
             valid_statuses = [s.name for s in OrderStatus if s.name not in ["CANCELLED", "REJECTED"]]
             default_idx = valid_statuses.index(order.status.name) if order.status.name in valid_statuses else 0
-            new_status = st.selectbox("Order Status", valid_statuses, index=default_idx)
+            new_status = st.selectbox("Order Status", valid_statuses, index=default_idx, format_func=lambda s: STATUS_HUMAN_MAP.get(s, s.replace("_", " ").title()))
             
             if st.button("Update Statuses"):
                 requires_amount = ["PROCESSING", "READY", "DELIVERED"]
