@@ -39,6 +39,17 @@ def init_db():
         db.commit()
     except Exception:
         db.rollback()
+
+    try:
+        db.execute(text("UPDATE orders SET order_id = REPLACE(order_id, 'AC-', '') WHERE order_id LIKE 'AC-%'"))
+        db.execute(text("UPDATE orders SET order_id = REPLACE(order_id, 'AC', '') WHERE order_id LIKE 'AC%'"))
+        db.execute(text("UPDATE order_items SET order_id = REPLACE(order_id, 'AC-', '') WHERE order_id LIKE 'AC-%'"))
+        db.execute(text("UPDATE order_items SET order_id = REPLACE(order_id, 'AC', '') WHERE order_id LIKE 'AC%'"))
+        db.execute(text("UPDATE point_transactions SET order_id = REPLACE(order_id, 'AC-', '') WHERE order_id LIKE 'AC-%'"))
+        db.execute(text("UPDATE point_transactions SET order_id = REPLACE(order_id, 'AC', '') WHERE order_id LIKE 'AC%'"))
+        db.commit()
+    except Exception:
+        db.rollback()
     finally:
         db.close()
 

@@ -92,6 +92,16 @@ def add_points_transaction(db: Session, customer_id: int, points: int, transacti
     db.add(pt)
     db.commit()
 
+def clean_order_id(order_id: Any) -> str:
+    if not order_id:
+        return ""
+    s = str(order_id).strip()
+    if s.startswith("AC-"):
+        return s[3:]
+    if s.startswith("AC"):
+        return s[2:]
+    return s
+
 def _generate_next_order_id(db: Session) -> str:
     existing_ids = db.query(Order.order_id).all()
     max_num = 1000
