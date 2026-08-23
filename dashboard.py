@@ -107,106 +107,54 @@ components.html(
     height=0
 )
 
-# Initialize database session
-db = SessionLocal()
+with SessionLocal() as db:
+    # ----- SCOREBOARD METRICS -----
+    st.markdown("### 📊 Live Analytics")
+    metric_col1, metric_col2, metric_col3 = st.columns(3)
 
-# ----- SCOREBOARD METRICS -----
-st.markdown("### 📊 Live Analytics")
-metric_col1, metric_col2, metric_col3 = st.columns(3)
+    total_customers = db.query(Customer).count()
+    active_orders_count = db.query(Order).filter(~Order.status.in_([OrderStatus.DELIVERED, OrderStatus.CANCELLED, OrderStatus.REJECTED])).count()
+    pending_pickups = db.query(Order).filter(Order.status == OrderStatus.PENDING_PICKUP).count()
 
-total_customers = db.query(Customer).count()
-active_orders_count = db.query(Order).filter(~Order.status.in_([OrderStatus.DELIVERED, OrderStatus.CANCELLED, OrderStatus.REJECTED])).count()
-pending_pickups = db.query(Order).filter(Order.status == OrderStatus.PENDING_PICKUP).count()
+    metric_col1.metric("Active Orders", active_orders_count)
+    metric_col2.metric("Pending Pickups", pending_pickups)
+    metric_col3.metric("Total Customers", total_customers)
 
-metric_col1.metric("Active Orders", active_orders_count)
-metric_col2.metric("Pending Pickups", pending_pickups)
-metric_col3.metric("Total Customers", total_customers)
+    st.markdown("---")
 
-st.markdown("---")
+    # ----- TABS -----
+    tab1, tab2, tab3, tab4 = st.tabs(["📋 Active Orders", "👥 Customer Database", "⚙️ Staff Settings", "🏷️ Price Catalog Manager"])
 
-# ----- SIDEBAR LOGIC (HIDDEN FOR NOW) -----
-_DROP_OFF_CODE_STORED = """
-with st.sidebar:
-    st.header("🏢 Walk-in Store Drop-off")
-    st.markdown("Manually enter a customer who walked into the store.")
-    
-    with st.form("manual_entry_form"):
-        manual_phone = st.text_input("Customer Phone Number")
-        manual_name = st.text_input("Customer Name (Leave blank if existing)")
-        manual_service_list = st.multiselect("Service Category", ["Dry Clean", "Washing", "Steam Press"], default=["Dry Clean"])
-        manual_items = st.number_input("Item Count", min_value=1, value=1)
-        manual_amount = st.number_input("Total Amount (₹)", min_value=0.0, value=0.0, step=10.0)
-        manual_instructions = st.text_area("Special Instructions (Optional)")
+    def load_active_orders(db_session, show_all=False):
+        if show_all:
+            orders = db_session.query(Order).all()
+        else:
+            orders = db_session.query(Order).filter(~Order.status.in_([OrderStatus.DELIVERED, OrderStatus.CANCELLED, OrderStatus.REJECTED])).all()
         
-        submitted = st.form_submit_button("Create Drop-off Order")
-        
-        if submitted:
-            if not manual_phone:
-                st.error("Phone number is required.")
-            elif manual_amount <= 0:
-                st.error("Please enter the total amount to be paid.")
-            else:
-                cust = get_customer(db, manual_phone)
-                if not cust:
-                    cust = create_customer(db, manual_phone, name=manual_name)
-                elif manual_name:
-                    update_customer_name(db, cust.customer_id, manual_name)
-                
-                manual_service = ", ".join(manual_service_list)
-                
-                # Create the order
-                new_order = create_order(
-                    db, 
-                    cust.customer_id, 
-                    manual_items, 
-                    order_type="STORE_DROP",
-                    service_category=manual_service,
-                    flat_address="N/A (Store Drop)",
-                    estimated_amount=manual_amount,
-                    delivery_fee=0.0,
-                    special_instructions=manual_instructions if manual_instructions else "None",
-                    disclaimer_accepted=True
-                )
-                new_order.total_amount = manual_amount
-                new_order.status = OrderStatus.IN_SHOP # Walk-ins start IN_SHOP
-                db.commit()
-                st.success(f"Created Order #{new_order.order_id} successfully!")
-"""
+        data = []
+        for o in orders:
+            delivery_fee = getattr(o, "delivery_fee", 0.0)
+            raw_est = o.estimated_amount or 0.0
+            raw_total = o.total_amount or 0.0
+            
+            data.append({
+                "Order ID": o.order_id,
+                "Type": o.order_type.name,
+                "Service(s)": o.service_category or "Dry Clean",
+                "Customer Name": o.customer.name if o.customer and o.customer.name else "Unknown",
+                "Customer Phone": o.customer.phone_number if o.customer else "Unknown",
+                "Text Address": o.flat_address or "N/A",
+                "GPS Location": o.customer.last_location_gps if o.customer and o.customer.last_location_gps else "N/A",
+                "Items": o.item_count,
+                "Final Total": f"₹{raw_total + delivery_fee - o.points_redeemed}" if o.total_amount else f"₹{raw_est + delivery_fee - o.points_redeemed}",
+                "Payment": o.payment_status.name,
+                "Status": o.status.name
+            })
+        return pd.DataFrame(data), orders
 
-# ----- TABS -----
-tab1, tab2, tab3, tab4 = st.tabs(["📋 Active Orders", "👥 Customer Database", "⚙️ Staff Settings", "🏷️ Price Catalog Manager"])
-
-def load_active_orders(show_all=False):
-    if show_all:
-        orders = db.query(Order).all()
-    else:
-        # Fetch active orders
-        orders = db.query(Order).filter(~Order.status.in_([OrderStatus.DELIVERED, OrderStatus.CANCELLED, OrderStatus.REJECTED])).all()
-    
-    data = []
-    for o in orders:
-        delivery_fee = getattr(o, "delivery_fee", 0.0)
-        raw_est = o.estimated_amount or 0.0
-        raw_total = o.total_amount or 0.0
-        
-        data.append({
-            "Order ID": o.order_id,
-            "Type": o.order_type.name,
-            "Service(s)": o.service_category or "Dry Clean",
-            "Customer Name": o.customer.name if o.customer and o.customer.name else "Unknown",
-            "Customer Phone": o.customer.phone_number if o.customer else "Unknown",
-            "Text Address": o.flat_address or "N/A",
-            "GPS Location": o.customer.last_location_gps if o.customer and o.customer.last_location_gps else "N/A",
-            "Items": o.item_count,
-            "Final Total": f"₹{raw_total + delivery_fee - o.points_redeemed}" if o.total_amount else f"₹{raw_est + delivery_fee - o.points_redeemed}",
-            "Payment": o.payment_status.name,
-            "Status": o.status.name
-        })
-    return pd.DataFrame(data), orders
-
-with tab1:
-    show_all = st.checkbox("Show all orders (including delivered)", value=False)
-    df, raw_orders = load_active_orders(show_all)
+    with tab1:
+        show_all = st.checkbox("Show all orders (including delivered)", value=False)
+        df, raw_orders = load_active_orders(db, show_all)
     
     if df.empty:
         st.info("No orders found matching the criteria.")
@@ -812,4 +760,3 @@ with tab4:
             st.success(f"Successfully deleted '{item_to_delete}' from catalog!")
             st.rerun()
 
-db.close()

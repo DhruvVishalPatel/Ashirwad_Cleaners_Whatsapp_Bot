@@ -53,7 +53,9 @@ def get_monthly_order_count(db: Session, customer_id: int):
     ).count()
 
 def get_available_points(db: Session, customer_id: int) -> int:
-    transactions = db.query(PointTransaction).filter(PointTransaction.customer_id == customer_id).order_by(PointTransaction.created_at.asc()).all()
+    transactions = db.query(PointTransaction).filter(
+        PointTransaction.customer_id == customer_id
+    ).order_by(PointTransaction.created_at.asc()).all()
     now = datetime.utcnow()
     
     buckets = []
@@ -63,16 +65,17 @@ def get_available_points(db: Session, customer_id: int) -> int:
         elif t.transaction_type == "REDEEMED":
             points_to_deduct = t.points
             for b in buckets:
-                if b['amount'] > 0:
+                # Deduct only from buckets that were unexpired at the time of redemption
+                if b['amount'] > 0 and (b['expires_at'] is None or b['expires_at'] > t.created_at):
                     deduct = min(b['amount'], points_to_deduct)
                     b['amount'] -= deduct
                     points_to_deduct -= deduct
-                if points_to_deduct == 0:
-                    break
+                    if points_to_deduct == 0:
+                        break
                     
-    # Sum only unexpired points
+    # Sum only unexpired points as of now
     available = sum(b['amount'] for b in buckets if b['amount'] > 0 and (b['expires_at'] is None or b['expires_at'] > now))
-    return available
+    return max(0, available)
 
 def add_points_transaction(db: Session, customer_id: int, points: int, transaction_type: str, order_id: str = None):
     expires_at = None
@@ -89,54 +92,65 @@ def add_points_transaction(db: Session, customer_id: int, points: int, transacti
     db.add(pt)
     db.commit()
 
-def create_order(db: Session, customer_id: int, item_count: int, order_type: str = "PICKUP", service_category: str = None, flat_address: str = None, estimated_amount: float = None, delivery_fee: float = 0.0, points_redeemed: int = 0, special_instructions: str = None, disclaimer_accepted: bool = True, garments_list: list = None):
-    # Generate sequential ID based on maximum existing ID
+def _generate_next_order_id(db: Session) -> str:
+    existing_ids = db.query(Order.order_id).filter(Order.order_id.like("AC-%")).all()
     max_num = 1000
-    existing_ids = db.query(Order.order_id).all()
     for (o_id,) in existing_ids:
-        if o_id.startswith("AC-"):
-            try:
-                num = int(o_id.split("-")[1])
+        try:
+            parts = o_id.split("-")
+            if len(parts) > 1:
+                num = int(parts[1])
                 if num > max_num:
                     max_num = num
-            except ValueError:
-                pass
-    order_id = f"AC-{max_num + 1}"
-    
-    db_order = Order(
-        order_id=order_id,
-        customer_id=customer_id,
-        item_count=item_count,
-        order_type=OrderType[order_type],
-        service_category=service_category,
-        flat_address=flat_address,
-        estimated_amount=estimated_amount,
-        delivery_fee=delivery_fee,
-        points_redeemed=points_redeemed,
-        special_instructions=special_instructions,
-        disclaimer_accepted=disclaimer_accepted
-    )
-    db.add(db_order)
-    db.commit()
-    db.refresh(db_order)
-    
-    # Add OrderItems if provided
-    if garments_list:
-        for item in garments_list:
-            oi = OrderItem(
-                order_id=db_order.order_id,
-                garment_type=item.get("normalized_name", "Unknown"),
-                service_type=item.get("service_category", "Dry Clean"),
-                quantity=item.get("quantity", 1)
+        except ValueError:
+            pass
+    return f"AC-{max_num + 1}"
+
+def create_order(db: Session, customer_id: int, item_count: int, order_type: str = "PICKUP", service_category: str = None, flat_address: str = None, estimated_amount: float = None, delivery_fee: float = 0.0, points_redeemed: int = 0, special_instructions: str = None, disclaimer_accepted: bool = True, garments_list: list = None):
+    from sqlalchemy.exc import IntegrityError
+
+    for _ in range(5):
+        order_id = _generate_next_order_id(db)
+        try:
+            db_order = Order(
+                order_id=order_id,
+                customer_id=customer_id,
+                item_count=item_count,
+                order_type=OrderType[order_type],
+                service_category=service_category,
+                flat_address=flat_address,
+                estimated_amount=estimated_amount,
+                delivery_fee=delivery_fee,
+                points_redeemed=points_redeemed,
+                special_instructions=special_instructions,
+                disclaimer_accepted=disclaimer_accepted
             )
-            db.add(oi)
-        db.commit()
-    
-    # If points were redeemed, log the transaction
-    if points_redeemed > 0:
-        add_points_transaction(db, customer_id, points_redeemed, "REDEEMED", db_order.order_id)
-        
-    return db_order
+            db.add(db_order)
+            db.commit()
+            db.refresh(db_order)
+            
+            # Add OrderItems if provided
+            if garments_list:
+                for item in garments_list:
+                    oi = OrderItem(
+                        order_id=db_order.order_id,
+                        garment_type=item.get("normalized_name", "Unknown"),
+                        service_type=item.get("service_category", "Dry Clean"),
+                        quantity=item.get("quantity", 1)
+                    )
+                    db.add(oi)
+                db.commit()
+            
+            # If points were redeemed, log the transaction
+            if points_redeemed > 0:
+                add_points_transaction(db, customer_id, points_redeemed, "REDEEMED", db_order.order_id)
+                
+            return db_order
+        except IntegrityError:
+            db.rollback()
+            continue
+
+    raise RuntimeError("Failed to generate a unique order ID after 5 attempts.")
 
 def get_runners(db: Session):
     return db.query(Runner).all()

@@ -1,5 +1,8 @@
+from contextlib import asynccontextmanager
 import os
 import traceback
+from datetime import datetime, time
+from zoneinfo import ZoneInfo
 from fastapi import FastAPI, Request, BackgroundTasks, HTTPException
 from fastapi.responses import PlainTextResponse
 from fastapi.staticfiles import StaticFiles
@@ -14,59 +17,64 @@ from app.core.logger import logger
 
 load_dotenv()
 
-app = FastAPI(title="Ashirwad Cleaners Agent API")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info("Initializing database schema...")
+    init_db()
+    logger.info("Database schema initialized successfully.")
+    yield
+
+app = FastAPI(title="Ashirwad Cleaners Agent API", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 VERIFY_TOKEN = os.environ.get("VERIFY_TOKEN", "YOUR_CUSTOM_VERIFY_TOKEN")
 
-@app.on_event("startup")
-def on_startup():
-    logger.info("Initializing database schema...")
-    init_db()
-    logger.info("Database schema initialized successfully.")
-
 def process_whatsapp_message(payload: dict):
     # This runs in the background
     try:
-        # Extract basic info from Meta Payload
-        entry = payload.get("entry", [])[0]
-        changes = entry.get("changes", [])[0]
-        value = changes.get("value", {})
+        # Extract basic info from Meta Payload with safe checks
+        entries = payload.get("entry", [])
+        if not isinstance(entries, list) or not entries:
+            return
+            
+        changes = entries[0].get("changes", [])
+        if not isinstance(changes, list) or not changes:
+            return
+            
+        value = changes[0].get("value", {})
         messages = value.get("messages", [])
-        
-        if not messages:
+        if not isinstance(messages, list) or not messages:
             return
             
         message = messages[0]
         phone_number = message.get("from")
-        
-        db = SessionLocal()
+        if not phone_number:
+            return
         
         # 1. Check or Create Customer
-        customer = get_customer(db, phone_number)
-        if not customer:
-            customer = create_customer(db, phone_number)
+        with SessionLocal() as db:
+            customer = get_customer(db, phone_number)
+            if not customer:
+                customer = create_customer(db, phone_number)
+                
+            customer_id = customer.customer_id
+            customer_name = customer.name or ""
+            lang = customer.preferred_language or ""
             
-        lang = customer.preferred_language or ""
         lang_for_warning = lang if lang else "ENGLISH"
- 
-        # Working Hours Check
-        from datetime import datetime, time
-        from zoneinfo import ZoneInfo
+
+        # Working Hours Check (9:00 AM to 8:30 PM IST)
         ist = ZoneInfo("Asia/Kolkata")
         now = datetime.now(ist)
         if not (time(9, 0) <= now.time() <= time(20, 30)):
             send_text_message(phone_number, t("CLOSED_WARNING", lang_for_warning))
-            db.close()
-            return {"status": "ok"}
-        
-        db.close()  # Close DB before calling LangGraph (it opens its own connections if needed)
+            return
         
         # Handle Interactive vs Text vs Location
         if message.get("type") == "interactive":
-            interactive = message.get("interactive")
+            interactive = message.get("interactive", {})
             if interactive.get("type") == "button_reply":
-                text = interactive.get("button_reply", {}).get("id")
+                text = interactive.get("button_reply", {}).get("id", "")
             else:
                 text = "UNKNOWN_INTERACTIVE"
         elif message.get("type") == "location":
@@ -85,12 +93,12 @@ def process_whatsapp_message(payload: dict):
         if not current_state_data:
             current_state_data = {
                 "phone_number": phone_number,
-                "customer_id": customer.customer_id,
+                "customer_id": customer_id,
                 "language": lang,
                 "current_flow": "IDLE",
                 "current_state": "",
                 "last_active_state": "",
-                "customer_name": customer.name or "",
+                "customer_name": customer_name,
                 "garments_list": [],
                 "item_count": 0,
                 "points_redeemed": 0,
@@ -131,4 +139,5 @@ async def receive_webhook(request: Request, background_tasks: BackgroundTasks):
         return {"status": "ok"}
     except Exception as e:
         logger.error(f"Webhook Endpoint Error: {e}")
-        return {"status": "error"}
+        raise HTTPException(status_code=400, detail="Invalid payload")
+

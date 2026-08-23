@@ -34,8 +34,9 @@ def classify_intent(user_text: str) -> tuple[str, str]:
     """
 
     # Enforce strict JSON output matching our schema
+    model_name = os.environ.get("GEMINI_MODEL", "gemini-3.6-flash")
     response = client.models.generate_content(
-        model="gemini-flash-latest",
+        model=model_name,
         contents=prompt,
         config=types.GenerateContentConfig(
             response_mime_type="application/json",
@@ -75,21 +76,19 @@ def generate_estimate(user_text: str, language: str = "ENGLISH") -> dict:
     all_valid_items = {}
     catalog_summary = {}
     
-    db = SessionLocal()
     try:
-        items = db.query(CatalogItem).all()
-        for item in items:
-            cat = item.service_type
-            if cat not in all_valid_items:
-                all_valid_items[cat] = {}
-                catalog_summary[cat] = []
-            all_valid_items[cat][item.item_name] = item.price
-            catalog_summary[cat].append(item.item_name)
+        with SessionLocal() as db:
+            items = db.query(CatalogItem).all()
+            for item in items:
+                cat = item.service_type
+                if cat not in all_valid_items:
+                    all_valid_items[cat] = {}
+                    catalog_summary[cat] = []
+                all_valid_items[cat][item.item_name] = item.price
+                catalog_summary[cat].append(item.item_name)
     except Exception as e:
-        print(f"Error querying catalog_items in generate_estimate: {e}")
+        logger.error(f"Error querying catalog_items in generate_estimate: {e}")
         return {"is_question": False, "reply": "", "total_items_count": 0, "base_estimate": 0.0, "identified_services": ["Dry Clean"], "garments": []}
-    finally:
-        db.close()
 
     prompt = f"""
     You are an AI assistant for Ashirwad Cleaners.
@@ -112,8 +111,9 @@ def generate_estimate(user_text: str, language: str = "ENGLISH") -> dict:
     Output ONLY valid JSON matching the schema. Do not do any math.
     """
 
+    model_name = os.environ.get("GEMINI_MODEL", "gemini-3.6-flash")
     response = client.models.generate_content(
-        model="gemini-flash-latest",
+        model=model_name,
         contents=prompt,
         config=types.GenerateContentConfig(
             response_mime_type="application/json",
