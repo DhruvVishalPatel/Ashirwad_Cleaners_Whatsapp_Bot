@@ -2,7 +2,13 @@ import re
 from typing import Dict, Any
 from app.core.database import SessionLocal
 from app.models.schemas import Customer
-from app.services.whatsapp_sender import send_text_message, send_interactive_buttons
+import app.services.whatsapp_sender as wa
+
+def send_text_message(to, text):
+    return wa.send_text_message(to, text)
+
+def send_interactive_buttons(to, body, buttons):
+    return wa.send_interactive_buttons(to, body, buttons)
 from app.core.translations import t
 from app.core.llm_router import generate_estimate
 from app.core.logger import logger
@@ -86,7 +92,8 @@ def pickup_name_node(state: dict) -> Dict[str, Any]:
                 "response_sent": False
             }
             
-        send_text_message(state["phone_number"], t("WELCOME_BACK", lang, name=name))
+        logger.info(f"[pickup_name_node] New customer name provided: '{name}'. Sending welcome message.")
+        send_text_message(state["phone_number"], t("NEW_CUSTOMER_WELCOME", lang, name=name))
         return {
             "customer_name": name,
             "current_state": "PICKUP_AWAITING_ITEMS",

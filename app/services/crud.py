@@ -93,18 +93,22 @@ def add_points_transaction(db: Session, customer_id: int, points: int, transacti
     db.commit()
 
 def _generate_next_order_id(db: Session) -> str:
-    existing_ids = db.query(Order.order_id).filter(Order.order_id.like("AC-%")).all()
+    existing_ids = db.query(Order.order_id).all()
     max_num = 1000
     for (o_id,) in existing_ids:
         try:
-            parts = o_id.split("-")
-            if len(parts) > 1:
-                num = int(parts[1])
+            digits = ''.join(filter(str.isdigit, o_id or ""))
+            if digits:
+                num = int(digits)
                 if num > max_num:
                     max_num = num
         except ValueError:
             pass
-    return f"AC-{max_num + 1}"
+    return str(max_num + 1)
+
+def now_ist() -> datetime:
+    from datetime import datetime, timezone, timedelta
+    return datetime.now(timezone.utc).astimezone(timezone(timedelta(hours=5, minutes=30))).replace(tzinfo=None)
 
 def create_order(db: Session, customer_id: int, item_count: int, order_type: str = "PICKUP", service_category: str = None, flat_address: str = None, estimated_amount: float = None, delivery_fee: float = 0.0, points_redeemed: int = 0, special_instructions: str = None, disclaimer_accepted: bool = True, garments_list: list = None):
     from sqlalchemy.exc import IntegrityError
@@ -123,7 +127,8 @@ def create_order(db: Session, customer_id: int, item_count: int, order_type: str
                 delivery_fee=delivery_fee,
                 points_redeemed=points_redeemed,
                 special_instructions=special_instructions,
-                disclaimer_accepted=disclaimer_accepted
+                disclaimer_accepted=disclaimer_accepted,
+                created_at=now_ist()
             )
             db.add(db_order)
             db.commit()

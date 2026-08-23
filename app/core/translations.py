@@ -44,10 +44,15 @@ TRANSLATIONS = {
         "HINGLISH": "Bahut badhiya! Hum aapke kapde pick up karne ke liye taiyar hain. Aapka naam kya hai?",
         "GUJLISH": "Khub saras! Ame aapna kapda pick up karva mate taiyar chhiye. Aapnu naam su che?"
     },
+    "NEW_CUSTOMER_WELCOME": {
+        "ENGLISH": "Nice to meet you, {name}! Please list the specific clothes you have and what service they need (e.g., 4 shirts for dry clean, 2 pants for washing).",
+        "HINGLISH": "Aapse milkar khushi hui, {name}! Kripya apne kapdo ki list aur service batayein (jaise: 4 shirts dry clean, 2 pants washing).",
+        "GUJLISH": "Aapne mali ne khub anand thayo, {name}! Kripa kari aapna kapda ni list ane service janavo (jem ke: 4 shirts dry clean, 2 pants washing)."
+    },
     "WELCOME_BACK": {
         "ENGLISH": "Welcome back, {name}! Please list the specific clothes you have and what service they need (e.g., 4 shirts for dry clean, 2 pants for washing).",
-        "HINGLISH": "Ashirwad Cleaners mein aapka fir se swagat hai, {name}! Kripya apne kapdo ki list aur service batayein (jaise ki, 4 shirts dry clean ke liye, 2 pants dhone ke liye).",
-        "GUJLISH": "Ashirwad Cleaners ma aapnu feri swagat che, {name}! Kripa kari aapna kapda ni list ane service janavo (jem ke, 4 shirts dry clean mate, 2 pants dhova mate)."
+        "HINGLISH": "Welcome back, {name}! Kripya apne kapdo ki list aur service batayein (jaise: 4 shirts dry clean, 2 pants washing).",
+        "GUJLISH": "Welcome back, {name}! Kripa kari aapna kapda ni list ane service janavo (jem ke: 4 shirts dry clean, 2 pants washing)."
     },
     "ITEMS_UNDERSTANDING_ERROR": {
         "ENGLISH": "I couldn't understand the items. Could you please list them out clearly? (e.g., '3 shirts for washing')",

@@ -107,6 +107,11 @@ components.html(
     height=0
 )
 
+def format_ist_datetime(dt) -> str:
+    if not dt:
+        return "N/A"
+    return dt.strftime("%d %b %Y, %I:%M %p")
+
 STATUS_HUMAN_MAP = {
     "PENDING_PICKUP": "Pending Pickup",
     "PICKED_UP": "Picked Up",
@@ -165,6 +170,9 @@ with SessionLocal() as db:
 
             data.append({
                 "Order ID": o.order_id,
+                "Order Date & Time": format_ist_datetime(o.created_at),
+                "Picked Up At": format_ist_datetime(o.picked_up_at),
+                "Delivered At": format_ist_datetime(o.delivered_at),
                 "Type": order_type_str,
                 "Service(s)": o.service_category or "Dry Clean",
                 "Customer Name": o.customer.name if o.customer and o.customer.name else "Unknown",
@@ -182,334 +190,353 @@ with SessionLocal() as db:
         show_all = st.checkbox("Show all orders (including delivered)", value=False)
         df, raw_orders = load_active_orders(db, show_all)
     
-    if df.empty:
-        st.info("No orders found matching the criteria.")
-    else:
-        st.dataframe(df, use_container_width=True)
-    
-    st.markdown("---")
-    st.subheader("Manage Order")
-    
-    # Selection box
-    manageable_orders = [o for o in raw_orders if o.status.name not in ["CANCELLED", "REJECTED"]]
-    order_id_list = [o.order_id for o in manageable_orders]
-    
-    selected_id = None
-    if not order_id_list:
-        st.info("No active orders to manage.")
-    else:
-        selected_id = st.selectbox("Select Order to Manage:", order_id_list)
+        if df.empty:
+            st.info("No orders found matching the criteria.")
+        else:
+            st.dataframe(df, use_container_width=True)
         
-    if selected_id:
-        # Get the selected order object
-        order = next(o for o in raw_orders if o.order_id == selected_id)
-        
-        with st.container(border=True):
-            st.markdown(f"#### Order #{order.order_id} Details")
-            st.markdown(f"**Services Requested:** {order.service_category}")
-            st.markdown(f"**Pickup Address:** {order.flat_address}")
-            
-            if order.items:
-                st.markdown("**Itemized Garments:**")
-                for oi in order.items:
-                    serv_display = oi.service_type.replace("_", " ").title() if oi.service_type else "Dry Clean"
-                    st.markdown(f"- {oi.quantity}x {oi.garment_type} ({serv_display})")
-            else:
-                st.markdown("*(No itemized breakdown available for this order)*")
-                
-        with st.expander("✏️ Edit Order Items & Address"):
-            new_address = st.text_input("Address", value=order.flat_address or "")
-            new_instructions = st.text_area("Special Instructions", value=order.special_instructions or "")
-            
-            st.markdown("##### Garments Breakdown")
-            
-            # Fetch all catalog items to populate dropdown options
-            catalog_items = db.query(CatalogItem).all()
-            all_garments = sorted(list(set([item.item_name for item in catalog_items])))
-            if not all_garments:
-                all_garments = ["Shirt", "Pant", "Saree", "Suit", "Blanket"] # Fallback if empty
-            
-            # Keep trace of current items in session state so user can add/delete rows dynamically
-            session_key = f"items_{order.order_id}"
-            if session_key not in st.session_state:
-                st.session_state[session_key] = [
-                    {
-                        "garment_type": oi.garment_type,
-                        "service_type": oi.service_type,
-                        "quantity": oi.quantity
-                    }
-                    for oi in order.items
-                ]
-            
-            current_items = st.session_state[session_key]
-            
-            updated_items = []
-            for idx, item in enumerate(current_items):
-                col_s, col_g, col_q, col_d = st.columns([3, 3, 2, 1])
-                with col_s:
-                    services_list = ["Dry Clean", "Washing", "Steam Press", "Petrol Wash"]
-                    display_service_map = {
-                        "dry_clean": "Dry Clean",
-                        "washing": "Washing",
-                        "steam_press": "Steam Press",
-                        "petrol_wash": "Petrol Wash"
-                    }
-                    code_service_map = {v: k for k, v in display_service_map.items()}
-                    current_disp = display_service_map.get(item["service_type"], "Dry Clean")
-                    s_idx = services_list.index(current_disp) if current_disp in services_list else 0
-                    s_disp = st.selectbox(f"Service #{idx+1}", services_list, index=s_idx, key=f"s_{order.order_id}_{idx}")
-                    s_type = code_service_map[s_disp]
-                    
-                with col_g:
-                    # Filter garments by the selected service category
-                    service_garments = sorted(list(set([c_item.item_name for c_item in catalog_items if c_item.service_type == s_type])))
-                    if not service_garments:
-                        service_garments = ["No items in this category"]
-                        g_type = service_garments[0]
-                        st.selectbox(f"Garment #{idx+1}", service_garments, index=0, disabled=True, key=f"g_{order.order_id}_{idx}")
-                    else:
-                        g_idx = service_garments.index(item["garment_type"]) if item["garment_type"] in service_garments else 0
-                        g_type = st.selectbox(f"Garment #{idx+1}", service_garments, index=g_idx, key=f"g_{order.order_id}_{idx}")
-                        
-                with col_q:
-                    qty = st.number_input(f"Qty #{idx+1}", min_value=1, value=int(item["quantity"]), key=f"q_{order.order_id}_{idx}")
-                with col_d:
-                    st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
-                    delete_row = st.checkbox("🗑️", key=f"del_{order.order_id}_{idx}")
-                
-                if not delete_row and g_type != "No items in this category":
-                    updated_items.append({
-                        "garment_type": g_type,
-                        "service_type": s_type,
-                        "quantity": qty
-                    })
-            
-            col_add, col_save = st.columns(2)
-            with col_add:
-                if st.button("➕ Add Item Row"):
-                    default_service = "dry_clean"
-                    default_garments = sorted(list(set([c_item.item_name for c_item in catalog_items if c_item.service_type == default_service])))
-                    if not default_garments:
-                        for s_key in ["washing", "steam_press", "petrol_wash"]:
-                            default_garments = sorted(list(set([c_item.item_name for c_item in catalog_items if c_item.service_type == s_key])))
-                            if default_garments:
-                                default_service = s_key
-                                break
-                    current_items.append({
-                        "garment_type": default_garments[0] if default_garments else "Shirt",
-                        "service_type": default_service,
-                        "quantity": 1
-                    })
-                    st.session_state[session_key] = current_items
-                    st.rerun()
-            with col_save:
-                if st.button("💾 Save Order Changes"):
-                    order.flat_address = new_address
-                    order.special_instructions = new_instructions
-                    
-                    db.query(OrderItem).filter(OrderItem.order_id == order.order_id).delete()
-                    
-                    total_qty = 0
-                    estimated_sum = 0.0
-                    services_used = set()
-                    
-                    price_lookup = {}
-                    for c_item in catalog_items:
-                        price_lookup[(c_item.service_type, c_item.item_name)] = c_item.price
-                    
-                    for u_item in updated_items:
-                        oi = OrderItem(
-                            order_id=order.order_id,
-                            garment_type=u_item["garment_type"],
-                            service_type=u_item["service_type"],
-                            quantity=u_item["quantity"]
-                        )
-                        db.add(oi)
-                        
-                        total_qty += u_item["quantity"]
-                        services_used.add(u_item["service_type"].replace("_", " ").title())
-                        
-                        item_price = price_lookup.get((u_item["service_type"], u_item["garment_type"]), 50.0)
-                        estimated_sum += (item_price * u_item["quantity"])
-                    
-                    order.item_count = total_qty
-                    order.estimated_amount = estimated_sum
-                    order.service_category = ", ".join(list(services_used)) if services_used else "Dry Clean"
-                    
-                    # Recalculate Delivery Fee
-                    monthly_orders = get_monthly_order_count(db, order.customer_id)
-                    if monthly_orders >= 4:
-                        order.delivery_fee = 0.0
-                    else:
-                        order.delivery_fee = 30.0
-                    
-                    db.commit()
-                    if session_key in st.session_state:
-                        del st.session_state[session_key]
-                    st.success("Order changes saved successfully!")
-                    st.rerun()
-                    
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            # Update Price
-            st.markdown("**Update Final Price**")
-            
-            raw_val = float(order.total_amount or order.estimated_amount or 0.0)
-            delivery_fee = getattr(order, "delivery_fee", 0.0)
-            points_redeemed = getattr(order, "points_redeemed", 0)
-            
-            st.markdown(f"*(Raw Estimate was: ₹{order.estimated_amount or 0.0})*")
-            new_raw_price = st.number_input("Raw Clothes Amount (₹)", min_value=0.0, value=raw_val, step=10.0)
-            
-            st.markdown(f"**+ Delivery Fee:** ₹{delivery_fee}")
-            if points_redeemed > 0:
-                st.markdown(f"**- Points Redeemed:** ₹{points_redeemed}")
-            st.markdown(f"**= Final Total to Collect:** ₹{new_raw_price + delivery_fee - points_redeemed}")
-            
-            if st.button("Save Price"):
-                order.total_amount = new_raw_price
-                db.commit()
-                st.success(f"Raw Price saved as ₹{new_raw_price}")
-                st.rerun()
-                
-        with col2:
-            # Update Payment & Order Status
-            st.markdown("**Update Status**")
-            new_payment = st.selectbox("Payment Status", [p.name for p in PaymentStatus], index=[p.name for p in PaymentStatus].index(order.payment_status.name), format_func=lambda p: PAYMENT_STATUS_HUMAN_MAP.get(p, p.replace("_", " ").title()))
-            valid_statuses = [s.name for s in OrderStatus if s.name not in ["CANCELLED", "REJECTED"]]
-            default_idx = valid_statuses.index(order.status.name) if order.status.name in valid_statuses else 0
-            new_status = st.selectbox("Order Status", valid_statuses, index=default_idx, format_func=lambda s: STATUS_HUMAN_MAP.get(s, s.replace("_", " ").title()))
-            
-            if st.button("Update Statuses"):
-                requires_amount = ["PROCESSING", "READY", "DELIVERED"]
-                
-                if new_status in requires_amount and (not order.total_amount or order.total_amount <= 0):
-                    st.error("❌ You MUST enter and save the 'Total Amount' before moving to PROCESSING, READY, or DELIVERED.")
-                elif order.status.name == "PENDING_PICKUP" and new_status not in ["PENDING_PICKUP", "CANCELLED", "REJECTED"] and not order.runner_id:
-                    st.error("❌ You must Dispatch a Runner before you can progress the order status from PENDING_PICKUP.")
-                elif new_status == "DELIVERED" and new_payment != "PAID":
-                    st.error("❌ Cannot mark order as DELIVERED until payment is PAID.")
-                else:
-                    order.payment_status = getattr(PaymentStatus, new_payment)
-                    order.status = getattr(OrderStatus, new_status)
-                    
-                    if new_payment == "PAID":
-                        from app.models.schemas import PointTransaction
-                        awarded = db.query(PointTransaction).filter(
-                            PointTransaction.order_id == order.order_id,
-                            PointTransaction.transaction_type == "EARNED"
-                        ).first()
-                        if not awarded:
-                            from app.services.crud import add_points_transaction
-                            points_earned = order.item_count * 2
-                            add_points_transaction(db, order.customer_id, points_earned, "EARNED", order.order_id)
-                            
-                    db.commit()
-                    
-                    # If moved to IN_SHOP from PENDING_PICKUP, notify user
-                    if new_status == "IN_SHOP" and order.customer and order.order_type.name == "PICKUP":
-                        send_text_message(order.customer.phone_number, f"Good news! Your clothes (Order #{order.order_id}) have reached our shop securely.")
-                    # If moved to READY
-                    elif new_status == "READY" and order.customer:
-                        delivery_fee = getattr(order, "delivery_fee", 0.0)
-                        points_redeemed = getattr(order, "points_redeemed", 0)
-                        final_amount = (order.total_amount or 0.0) + delivery_fee - points_redeemed
-                        
-                        if order.order_type.name == "PICKUP" and order.total_amount:
-                            if delivery_fee == 0.0:
-                                amount_text = f"Total bill is ₹{final_amount} (Delivery Fee Waived!)."
-                            else:
-                                amount_text = f"Total bill is ₹{final_amount} (Includes ₹{delivery_fee} Delivery Charge)."
-                        elif order.total_amount:
-                            amount_text = f"Total bill is ₹{final_amount}."
-                        else:
-                            amount_text = ""
-                        send_text_message(order.customer.phone_number, f"Your clothes for Order #{order.order_id} are ready! {amount_text}\nWe will deliver them soon")
-                    
-                    st.success("Statuses updated successfully.")
-                    st.rerun()
-                
-        with col3:
-            # Runner Dispatch
-            st.markdown("**Dispatch Delivery Runner**")
-            
-            runners = get_runners(db)
-            if not runners:
-                st.warning("No runners saved. Please add a runner in the sidebar.")
-            else:
-                runner_options = {f"{r.name} ({r.phone_number})": r.phone_number for r in runners}
-                selected_runner_label = st.selectbox("Select Runner", list(runner_options.keys()))
-                runner_phone = runner_options[selected_runner_label]
-                
-                if st.button("Dispatch Runner"):
-                    customer_phone = order.customer.phone_number if order.customer else "N/A"
-                    customer_name = order.customer.name if order.customer and order.customer.name else "Unknown"
-                    location = order.customer.last_location_gps if order.customer and order.customer.last_location_gps else "No Location Provided"
-                    
-                    if location != "No Location Provided":
-                        maps_link = f"https://www.google.com/maps?q={location}"
-                    else:
-                        maps_link = "No link available."
-                        
-                    action = 'PICKUP' if order.status.name == 'PENDING_PICKUP' else 'DELIVERY'
-                    
-                    if action == 'PICKUP':
-                        est_raw = order.estimated_amount or 0.0
-                        delivery_fee = getattr(order, "delivery_fee", 0.0)
-                        points_redeemed = getattr(order, "points_redeemed", 0)
-                        est_final = est_raw + delivery_fee - points_redeemed
-                        amount_display = f"TBD (Estimate: ₹{est_final})"
-                    else:
-                        delivery_fee = getattr(order, "delivery_fee", 0.0)
-                        points_redeemed = getattr(order, "points_redeemed", 0)
-                        final_total = (order.total_amount or 0.0) + delivery_fee - points_redeemed
-                        amount_display = f"₹{final_total}"
-                    
-                    dispatch_msg = (
-                        f"🚨 *NEW DISPATCH: {order.order_id}* 🚨\n\n"
-                        f"Action: {action}\n"
-                        f"Service: {order.service_category or 'Dry Clean'}\n"
-                        f"Customer: {customer_name} ({customer_phone})\n"
-                        f"Items: {order.item_count}\n"
-                        f"Instructions: {order.special_instructions or 'None'}\n"
-                        f"Flat Address: {order.flat_address or 'N/A'}\n"
-                        f"Location: {maps_link}\n"
-                        f"Amount to Collect: {amount_display}"
-                    )
-                    
-                    response = send_text_message(runner_phone, dispatch_msg)
-                    if response.get("status") == "mocked" or "error" not in response:
-                        # Record that a runner was dispatched so status progression is unlocked
-                        if not order.runner_id:
-                            order.runner_id = next(r.runner_id for r in runners if r.phone_number == runner_phone)
-                            db.commit()
-                        st.success(f"Dispatch message sent to {selected_runner_label}!")
-                    else:
-                        st.error("Failed to send WhatsApp message. Check API credentials.")
-                        
         st.markdown("---")
-        st.markdown("**⚠️ Danger Zone**")
-        col_rj, col_cn, _ = st.columns([1, 1, 2])
+        st.subheader("Manage Order")
+    
+        # Selection box
+        manageable_orders = [o for o in raw_orders if o.status.name not in ["CANCELLED", "REJECTED"]]
+        order_id_list = [o.order_id for o in manageable_orders]
         
-        with col_rj:
-            if st.button("Reject (Outside Paldi)"):
-                order.status = getattr(OrderStatus, "REJECTED")
-                db.commit()
-                if order.customer:
-                    send_text_message(order.customer.phone_number, f"We are sorry, but we currently only offer pickup and delivery within the Paldi area. Your pickup request (Order #{order.order_id}) has been rejected. However, you are always welcome to drop off your clothes at our shop!")
-                st.success("Order Rejected.")
-                st.rerun()
+        selected_id = None
+        if not order_id_list:
+            st.info("No active orders to manage.")
+        else:
+            selected_id = st.selectbox("Select Order to Manage:", order_id_list)
+            
+        if selected_id:
+            # Get the selected order object
+            order = next(o for o in raw_orders if o.order_id == selected_id)
+            
+            with st.container(border=True):
+                st.markdown(f"#### Order #{order.order_id} Details")
+                st.markdown(f"**📅 Order Date & Time:** {format_ist_datetime(order.created_at)}")
+                if order.picked_up_at:
+                    st.markdown(f"**🚚 Picked Up At:** {format_ist_datetime(order.picked_up_at)}")
+                if order.delivered_at:
+                    st.markdown(f"**✅ Delivered At:** {format_ist_datetime(order.delivered_at)}")
+                st.markdown(f"**Services Requested:** {order.service_category}")
+                st.markdown(f"**Pickup Address:** {order.flat_address}")
                 
-        with col_cn:
-            if st.button("Cancel Order"):
-                order.status = getattr(OrderStatus, "CANCELLED")
-                db.commit()
-                if order.customer:
-                    send_text_message(order.customer.phone_number, f"Your pickup request (Order #{order.order_id}) has been cancelled.")
-                st.success("Order Cancelled.")
-                st.rerun()
-
+                if order.items:
+                    st.markdown("**Itemized Garments:**")
+                    for oi in order.items:
+                        serv_display = oi.service_type.replace("_", " ").title() if oi.service_type else "Dry Clean"
+                        st.markdown(f"- {oi.quantity}x {oi.garment_type} ({serv_display})")
+                else:
+                    st.markdown("*(No itemized breakdown available for this order)*")
+                    
+            with st.expander("✏️ Edit Order Items & Address"):
+                new_address = st.text_input("Address", value=order.flat_address or "")
+                new_instructions = st.text_area("Special Instructions", value=order.special_instructions or "")
+                
+                st.markdown("##### Garments Breakdown")
+                
+                # Fetch all catalog items to populate dropdown options
+                catalog_items = db.query(CatalogItem).all()
+                all_garments = sorted(list(set([item.item_name for item in catalog_items])))
+                if not all_garments:
+                    all_garments = ["Shirt", "Pant", "Saree", "Suit", "Blanket"] # Fallback if empty
+                
+                # Keep trace of current items in session state so user can add/delete rows dynamically
+                session_key = f"items_{order.order_id}"
+                if session_key not in st.session_state:
+                    st.session_state[session_key] = [
+                        {
+                            "garment_type": oi.garment_type,
+                            "service_type": oi.service_type,
+                            "quantity": oi.quantity
+                        }
+                        for oi in order.items
+                    ]
+                
+                current_items = st.session_state[session_key]
+                
+                updated_items = []
+                for idx, item in enumerate(current_items):
+                    col_s, col_g, col_q, col_d = st.columns([3, 3, 2, 1])
+                    with col_s:
+                        services_list = ["Dry Clean", "Washing", "Steam Press", "Petrol Wash"]
+                        display_service_map = {
+                            "dry_clean": "Dry Clean",
+                            "washing": "Washing",
+                            "steam_press": "Steam Press",
+                            "petrol_wash": "Petrol Wash"
+                        }
+                        code_service_map = {v: k for k, v in display_service_map.items()}
+                        current_disp = display_service_map.get(item["service_type"], "Dry Clean")
+                        s_idx = services_list.index(current_disp) if current_disp in services_list else 0
+                        s_disp = st.selectbox(f"Service #{idx+1}", services_list, index=s_idx, key=f"s_{order.order_id}_{idx}")
+                        s_type = code_service_map[s_disp]
+                        
+                    with col_g:
+                        # Filter garments by the selected service category
+                        service_garments = sorted(list(set([c_item.item_name for c_item in catalog_items if c_item.service_type == s_type])))
+                        if not service_garments:
+                            service_garments = ["No items in this category"]
+                            g_type = service_garments[0]
+                            st.selectbox(f"Garment #{idx+1}", service_garments, index=0, disabled=True, key=f"g_{order.order_id}_{idx}")
+                        else:
+                            g_idx = service_garments.index(item["garment_type"]) if item["garment_type"] in service_garments else 0
+                            g_type = st.selectbox(f"Garment #{idx+1}", service_garments, index=g_idx, key=f"g_{order.order_id}_{idx}")
+                            
+                    with col_q:
+                        qty = st.number_input(f"Qty #{idx+1}", min_value=1, value=int(item["quantity"]), key=f"q_{order.order_id}_{idx}")
+                    with col_d:
+                        st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
+                        delete_row = st.checkbox("🗑️", key=f"del_{order.order_id}_{idx}")
+                    
+                    if not delete_row and g_type != "No items in this category":
+                        updated_items.append({
+                            "garment_type": g_type,
+                            "service_type": s_type,
+                            "quantity": qty
+                        })
+                
+                col_add, col_save = st.columns(2)
+                with col_add:
+                    if st.button("➕ Add Item Row"):
+                        default_service = "dry_clean"
+                        default_garments = sorted(list(set([c_item.item_name for c_item in catalog_items if c_item.service_type == default_service])))
+                        if not default_garments:
+                            for s_key in ["washing", "steam_press", "petrol_wash"]:
+                                default_garments = sorted(list(set([c_item.item_name for c_item in catalog_items if c_item.service_type == s_key])))
+                                if default_garments:
+                                    default_service = s_key
+                                    break
+                        current_items.append({
+                            "garment_type": default_garments[0] if default_garments else "Shirt",
+                            "service_type": default_service,
+                            "quantity": 1
+                        })
+                        st.session_state[session_key] = current_items
+                        st.rerun()
+                with col_save:
+                    if st.button("💾 Save Order Changes"):
+                        order.flat_address = new_address
+                        order.special_instructions = new_instructions
+                        
+                        db.query(OrderItem).filter(OrderItem.order_id == order.order_id).delete()
+                        
+                        total_qty = 0
+                        estimated_sum = 0.0
+                        services_used = set()
+                        
+                        price_lookup = {}
+                        for c_item in catalog_items:
+                            price_lookup[(c_item.service_type, c_item.item_name)] = c_item.price
+                        
+                        for u_item in updated_items:
+                            oi = OrderItem(
+                                order_id=order.order_id,
+                                garment_type=u_item["garment_type"],
+                                service_type=u_item["service_type"],
+                                quantity=u_item["quantity"]
+                            )
+                            db.add(oi)
+                            
+                            total_qty += u_item["quantity"]
+                            services_used.add(u_item["service_type"].replace("_", " ").title())
+                            
+                            item_price = price_lookup.get((u_item["service_type"], u_item["garment_type"]), 50.0)
+                            estimated_sum += (item_price * u_item["quantity"])
+                        
+                        order.item_count = total_qty
+                        order.estimated_amount = estimated_sum
+                        order.service_category = ", ".join(list(services_used)) if services_used else "Dry Clean"
+                        
+                        # Recalculate Delivery Fee
+                        monthly_orders = get_monthly_order_count(db, order.customer_id)
+                        if monthly_orders >= 4:
+                            order.delivery_fee = 0.0
+                        else:
+                            order.delivery_fee = 30.0
+                        
+                        db.commit()
+                        if session_key in st.session_state:
+                            del st.session_state[session_key]
+                        st.success("Order changes saved successfully!")
+                        st.rerun()
+                        
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                # Update Price
+                st.markdown("**Update Final Price**")
+                
+                raw_val = float(order.total_amount or order.estimated_amount or 0.0)
+                delivery_fee = getattr(order, "delivery_fee", 0.0)
+                points_redeemed = getattr(order, "points_redeemed", 0)
+                
+                st.markdown(f"*(Raw Estimate was: ₹{order.estimated_amount or 0.0})*")
+                new_raw_price = st.number_input("Raw Clothes Amount (₹)", min_value=0.0, value=raw_val, step=10.0, key=f"raw_price_{order.order_id}")
+                
+                st.markdown(f"**+ Delivery Fee:** ₹{delivery_fee}")
+                if points_redeemed > 0:
+                    st.markdown(f"**- Points Redeemed:** ₹{points_redeemed}")
+                st.markdown(f"**= Final Total to Collect:** ₹{new_raw_price + delivery_fee - points_redeemed}")
+                
+                if st.button("Save Price", key=f"btn_save_price_{order.order_id}"):
+                    order.total_amount = new_raw_price
+                    db.commit()
+                    st.success(f"Raw Price saved as ₹{new_raw_price}")
+                    st.rerun()
+                    
+            with col2:
+                # Update Payment & Order Status
+                st.markdown("**Update Status**")
+                new_payment = st.selectbox("Payment Status", [p.name for p in PaymentStatus], index=[p.name for p in PaymentStatus].index(order.payment_status.name), format_func=lambda p: PAYMENT_STATUS_HUMAN_MAP.get(p, p.replace("_", " ").title()), key=f"pay_status_{order.order_id}")
+                valid_statuses = [s.name for s in OrderStatus if s.name not in ["CANCELLED", "REJECTED"]]
+                default_idx = valid_statuses.index(order.status.name) if order.status.name in valid_statuses else 0
+                new_status = st.selectbox("Order Status", valid_statuses, index=default_idx, format_func=lambda s: STATUS_HUMAN_MAP.get(s, s.replace("_", " ").title()), key=f"ord_status_{order.order_id}")
+                
+                if st.button("Update Statuses", key=f"btn_update_status_{order.order_id}"):
+                    requires_amount = ["PROCESSING", "READY", "DELIVERED"]
+                    
+                    if new_status in requires_amount and (not order.total_amount or order.total_amount <= 0):
+                        st.error("❌ You MUST enter and save the 'Total Amount' before moving to PROCESSING, READY, or DELIVERED.")
+                    elif order.status.name == "PENDING_PICKUP" and new_status not in ["PENDING_PICKUP", "CANCELLED", "REJECTED"] and not order.runner_id:
+                        st.error("❌ You must Dispatch a Runner before you can progress the order status from PENDING_PICKUP.")
+                    elif new_status == "DELIVERED" and new_payment != "PAID":
+                        st.error("❌ Cannot mark order as DELIVERED until payment is PAID.")
+                    else:
+                        from app.services.crud import now_ist
+                        order.payment_status = getattr(PaymentStatus, new_payment)
+                        order.status = getattr(OrderStatus, new_status)
+                        
+                        if new_status in ["IN_SHOP", "PICKED_UP"] and not order.picked_up_at:
+                            order.picked_up_at = now_ist()
+                        if new_status == "DELIVERED" and not order.delivered_at:
+                            order.delivered_at = now_ist()
+                        
+                        if new_payment == "PAID":
+                            from app.models.schemas import PointTransaction
+                            awarded = db.query(PointTransaction).filter(
+                                PointTransaction.order_id == order.order_id,
+                                PointTransaction.transaction_type == "EARNED"
+                            ).first()
+                            if not awarded:
+                                from app.services.crud import add_points_transaction
+                                points_earned = order.item_count * 2
+                                add_points_transaction(db, order.customer_id, points_earned, "EARNED", order.order_id)
+                                
+                        db.commit()
+                        
+                        # If moved to IN_SHOP from PENDING_PICKUP, notify user
+                        if new_status == "IN_SHOP" and order.customer and order.order_type.name == "PICKUP":
+                            send_text_message(order.customer.phone_number, f"Good news! Your clothes (Order #{order.order_id}) have reached our shop securely.")
+                        # If moved to READY
+                        elif new_status == "READY" and order.customer:
+                            delivery_fee = getattr(order, "delivery_fee", 0.0)
+                            points_redeemed = getattr(order, "points_redeemed", 0)
+                            final_amount = (order.total_amount or 0.0) + delivery_fee - points_redeemed
+                            
+                            if order.order_type.name == "PICKUP" and order.total_amount:
+                                if delivery_fee == 0.0:
+                                    amount_text = f"Total bill is ₹{final_amount} (Delivery Fee Waived!)."
+                                else:
+                                    amount_text = f"Total bill is ₹{final_amount} (Includes ₹{delivery_fee} Delivery Charge)."
+                            elif order.total_amount:
+                                amount_text = f"Total bill is ₹{final_amount}."
+                            else:
+                                amount_text = ""
+                            send_text_message(order.customer.phone_number, f"Your clothes for Order #{order.order_id} are ready! {amount_text}\nWe will deliver them soon")
+                        elif new_status == "DELIVERED" and order.customer:
+                            dt_created = format_ist_datetime(order.created_at)
+                            dt_del = format_ist_datetime(order.delivered_at)
+                            send_text_message(
+                                order.customer.phone_number,
+                                f"🎉 *Order #{order.order_id} Delivered!* 🎉\n\n"
+                                f"📅 *Order Placed*: {dt_created}\n"
+                                f"🚚 *Delivered At*: {dt_del}\n\n"
+                                f"Thank you for choosing Ashirwad Cleaners! We look forward to taking care of your garments again."
+                            )
+                        
+                        st.success("Statuses updated successfully.")
+                        st.rerun()
+                    
+            with col3:
+                # Runner Dispatch
+                st.markdown("**Dispatch Delivery Runner**")
+                
+                runners = get_runners(db)
+                if not runners:
+                    st.warning("No runners saved. Please add a runner in the sidebar.")
+                else:
+                    runner_options = {f"{r.name} ({r.phone_number})": r.phone_number for r in runners}
+                    selected_runner_label = st.selectbox("Select Runner", list(runner_options.keys()), key=f"sel_runner_{order.order_id}")
+                    runner_phone = runner_options[selected_runner_label]
+                    
+                    if st.button("Dispatch Runner", key=f"btn_dispatch_{order.order_id}"):
+                        customer_phone = order.customer.phone_number if order.customer else "N/A"
+                        customer_name = order.customer.name if order.customer and order.customer.name else "Unknown"
+                        location = order.customer.last_location_gps if order.customer and order.customer.last_location_gps else "No Location Provided"
+                        
+                        if location != "No Location Provided":
+                            maps_link = f"https://www.google.com/maps?q={location}"
+                        else:
+                            maps_link = "No link available."
+                            
+                        action = 'PICKUP' if order.status.name == 'PENDING_PICKUP' else 'DELIVERY'
+                        
+                        if action == 'PICKUP':
+                            est_raw = order.estimated_amount or 0.0
+                            delivery_fee = getattr(order, "delivery_fee", 0.0)
+                            points_redeemed = getattr(order, "points_redeemed", 0)
+                            est_final = est_raw + delivery_fee - points_redeemed
+                            amount_display = f"TBD (Estimate: ₹{est_final})"
+                        else:
+                            delivery_fee = getattr(order, "delivery_fee", 0.0)
+                            points_redeemed = getattr(order, "points_redeemed", 0)
+                            final_total = (order.total_amount or 0.0) + delivery_fee - points_redeemed
+                            amount_display = f"₹{final_total}"
+                        
+                        dispatch_msg = (
+                            f"🚨 *NEW DISPATCH: {order.order_id}* 🚨\n\n"
+                            f"Action: {action}\n"
+                            f"Service: {order.service_category or 'Dry Clean'}\n"
+                            f"Customer: {customer_name} ({customer_phone})\n"
+                            f"Items: {order.item_count}\n"
+                            f"Instructions: {order.special_instructions or 'None'}\n"
+                            f"Flat Address: {order.flat_address or 'N/A'}\n"
+                            f"Location: {maps_link}\n"
+                            f"Amount to Collect: {amount_display}"
+                        )
+                        
+                        response = send_text_message(runner_phone, dispatch_msg)
+                        if response.get("status") == "mocked" or "error" not in response:
+                            if not order.runner_id:
+                                order.runner_id = next(r.runner_id for r in runners if r.phone_number == runner_phone)
+                                db.commit()
+                            st.success(f"Dispatch message sent to {selected_runner_label}!")
+                        else:
+                            st.error("Failed to send WhatsApp message. Check API credentials.")
+                            
+            st.markdown("---")
+            st.markdown("**⚠️ Danger Zone**")
+            col_rj, col_cn, _ = st.columns([1, 1, 2])
+            
+            with col_rj:
+                if st.button("Reject (Outside Paldi)", key=f"btn_reject_{order.order_id}"):
+                    order.status = getattr(OrderStatus, "REJECTED")
+                    db.commit()
+                    if order.customer:
+                        send_text_message(order.customer.phone_number, f"We are sorry, but we currently only offer pickup and delivery within the Paldi area. Your pickup request (Order #{order.order_id}) has been rejected. However, you are always welcome to drop off your clothes at our shop!")
+                    st.success("Order Rejected.")
+                    st.rerun()
+                    
+            with col_cn:
+                if st.button("Cancel Order", key=f"btn_cancel_{order.order_id}"):
+                    order.status = getattr(OrderStatus, "CANCELLED")
+                    db.commit()
+                    if order.customer:
+                        send_text_message(order.customer.phone_number, f"Your pickup request (Order #{order.order_id}) has been cancelled.")
+                    st.success("Order Cancelled.")
+                    st.rerun()
 with tab2:
     st.header("👥 Customer Database")
     st.markdown("View all registered customers and edit their saved pickup addresses.")

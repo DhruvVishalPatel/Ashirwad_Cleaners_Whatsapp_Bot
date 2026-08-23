@@ -19,11 +19,23 @@ def get_db():
 def init_db():
     Base.metadata.create_all(bind=engine)
     
-    # Safe migration: Add preferred_language if it doesn't exist
+    # Safe migration: Add preferred_language, picked_up_at, delivered_at if they don't exist
     from sqlalchemy import text
     db = SessionLocal()
     try:
         db.execute(text("ALTER TABLE customers ADD COLUMN preferred_language VARCHAR DEFAULT 'ENGLISH'"))
+        db.commit()
+    except Exception:
+        db.rollback()
+        
+    try:
+        db.execute(text("ALTER TABLE orders ADD COLUMN picked_up_at DATETIME"))
+        db.commit()
+    except Exception:
+        db.rollback()
+
+    try:
+        db.execute(text("ALTER TABLE orders ADD COLUMN delivered_at DATETIME"))
         db.commit()
     except Exception:
         db.rollback()

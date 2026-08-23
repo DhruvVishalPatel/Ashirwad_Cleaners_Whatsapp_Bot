@@ -75,6 +75,6 @@ with SessionLocal() as db:
         points_redeemed=0
     )
     print(f"[Test 3] Order Created Successfully with ID: {order.order_id}")
-    assert order.order_id.startswith("AC-"), f"Invalid order id format: {order.order_id}"
+    assert order.order_id.isdigit() and int(order.order_id) >= 1001, f"Invalid order id format: {order.order_id}"
 
 print("✅ ALL TESTS PASSED SUCCESSFULLY!")

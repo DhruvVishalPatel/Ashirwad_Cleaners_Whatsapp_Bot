@@ -60,6 +60,9 @@ def classifier_node(state: BotState) -> Dict[str, Any]:
     
     logger.info(f"[ClassifierNode] Entry. Current Flow: {state.get('current_flow')}, State: {state.get('current_state')}, Input: '{text}'")
     
+    # 0. Reset turn flags
+    state["response_sent"] = False
+
     # 1. Explicit Language Selection Buttons
     if text.startswith("btn_lang_"):
         lang_map = {
@@ -108,6 +111,9 @@ def classifier_node(state: BotState) -> Dict[str, Any]:
     # 4. Active flow check
     if state.get("current_flow") != "IDLE":
         if text.startswith("btn_"):
+            return {"response_sent": False}
+            
+        if state.get("current_state") in ["PICKUP_AWAITING_NAME", "PICKUP_AWAITING_CONFIRMATION_ADDRESS"]:
             return {"response_sent": False}
             
         if state.get("current_state") in ["PICKUP_AWAITING_POINTS_REDEEM", "PICKUP_AWAITING_ADDRESS_BUTTON"]:
@@ -264,7 +270,7 @@ def route_next_node(state: BotState) -> str:
     return END
 
 def route_after_node(state: BotState) -> str:
-    if state.get("response_sent"):
+    if state.get("response_sent") or state.get("current_state") in ["PICKUP_AWAITING_ITEMS", "PICKUP_AWAITING_POINTS_REDEEM", "PICKUP_AWAITING_ADDRESS_BUTTON", "PICKUP_AWAITING_CONFIRMATION_ADDRESS"]:
         logger.info("[route_after_node] Response sent to user. Terminating graph execution run (END).")
         return END
     next_node = route_next_node(state)

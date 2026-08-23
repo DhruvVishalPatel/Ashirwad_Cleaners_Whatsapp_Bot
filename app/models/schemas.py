@@ -55,7 +55,7 @@ class PointTransaction(Base):
 
 class Order(Base):
     __tablename__ = 'orders'
-    order_id = Column(String, primary_key=True, index=True) # e.g., "AC-1001"
+    order_id = Column(String, primary_key=True, index=True) # e.g., "1001"
     customer_id = Column(Integer, ForeignKey('customers.customer_id'), nullable=False)
     order_type = Column(Enum(OrderType), default=OrderType.PICKUP, nullable=False)
     status = Column(Enum(OrderStatus), default=OrderStatus.PENDING_PICKUP, nullable=False)
@@ -72,6 +72,8 @@ class Order(Base):
     points_redeemed = Column(Integer, default=0)
     special_instructions = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    picked_up_at = Column(DateTime, nullable=True)
+    delivered_at = Column(DateTime, nullable=True)
     
     customer = relationship("Customer", back_populates="orders")
     items = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")

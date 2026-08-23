@@ -35,7 +35,7 @@ with SessionLocal() as db:
     db.refresh(cust)
     
     order = Order(
-        order_id="AC-9999",
+        order_id="1020",
         customer_id=cust.customer_id,
         item_count=5,
         order_type=OrderType.PICKUP,
@@ -58,5 +58,11 @@ with SessionLocal() as db:
     
     assert "PENDING_PICKUP" not in last_msg, "Failed! Raw snake_case 'PENDING_PICKUP' found in status message."
     assert "Pending Pickup" in last_msg, "Failed! Expected clean title case 'Pending Pickup'."
+    assert "Order #1020" in last_msg, f"Failed! Expected Order #1020 in message, got {last_msg}"
     
-    print("\n✅ HUMAN STATUS FORMATTING TEST PASSED PERFECTLY!")
+    # Cleanup test customer
+    db.query(Order).filter(Order.customer_id == cust.customer_id).delete()
+    db.delete(cust)
+    db.commit()
+
+print("\n✅ HUMAN STATUS FORMATTING TEST PASSED PERFECTLY!")
