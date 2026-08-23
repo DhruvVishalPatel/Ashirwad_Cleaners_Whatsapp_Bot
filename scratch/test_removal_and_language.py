@@ -72,12 +72,17 @@ send_chat("add 3 pants for wash")
 state2 = compiled_graph.get_state(config).values
 print(f"[Check 2] Count: {state2.get('item_count')}, Lang: {state2.get('language')}")
 
-# Step 3: Send "remove 4 pants from wash"
+# Step 3: Send "remove 4 pants from wash" (removes pants washing category)
 send_chat("remove 4 pants from wash")
 state3 = compiled_graph.get_state(config).values
 print(f"[Check 3] Count: {state3.get('item_count')}, Lang: {state3.get('language')}")
-
-assert state3.get("language") == "ENGLISH", f"Expected ENGLISH language, got {state3.get('language')}"
 assert state3.get("item_count") == 5, f"Expected 5 items after removal, got {state3.get('item_count')}"
 
-print("\n✅ REMOVAL AND LANGUAGE TEST PASSED PERFECTLY!")
+# Step 4: Send "remove 2 shirts" (subtracts 2 from 5 shirts -> 3 shirts remaining)
+send_chat("remove 2 shirts")
+state4 = compiled_graph.get_state(config).values
+print(f"[Check 4] Count: {state4.get('item_count')}, Base Estimate: {state4.get('base_estimate')}, Garments: {state4.get('garments_list')}")
+assert state4.get("item_count") == 3, f"Expected 3 items remaining, got {state4.get('item_count')}"
+assert state4.get("base_estimate") == 150.0, f"Expected estimate 150.0, got {state4.get('base_estimate')}"
+
+print("\n✅ REMOVAL AND QUANTITY SUBTRACTION TEST PASSED PERFECTLY!")

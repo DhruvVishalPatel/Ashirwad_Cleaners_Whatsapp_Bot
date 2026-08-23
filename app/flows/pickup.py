@@ -122,6 +122,34 @@ def pickup_name_node(state: dict) -> Dict[str, Any]:
             "response_sent": True
         }
 
+def process_garment_removal(existing_garments: list, remove_garments: list) -> list:
+    updated = [dict(g) for g in existing_garments]
+    for rem in remove_garments:
+        rem_name = rem.get("normalized_name", "").lower()
+        rem_cat = rem.get("service_category", "").lower()
+        rem_qty = rem.get("quantity", 1)
+        
+        matched_idx = -1
+        for idx, eg in enumerate(updated):
+            eg_name = eg.get("normalized_name", "").lower()
+            eg_cat = eg.get("service_category", "").lower()
+            if eg_name == rem_name:
+                if rem_cat and eg_cat and rem_cat == eg_cat:
+                    matched_idx = idx
+                    break
+                elif matched_idx == -1:
+                    matched_idx = idx
+                    
+        if matched_idx != -1:
+            curr_qty = updated[matched_idx].get("quantity", 1)
+            new_qty = curr_qty - rem_qty
+            if new_qty > 0:
+                updated[matched_idx]["quantity"] = new_qty
+            else:
+                updated.pop(matched_idx)
+                
+    return updated
+
 def pickup_items_node(state: dict) -> Dict[str, Any]:
     """
     Processes listed clothes using Gemini and generates estimates.
@@ -156,12 +184,20 @@ def pickup_items_node(state: dict) -> Dict[str, Any]:
     if is_addition and existing_garments and new_garments:
         merged_garments = list(existing_garments) + new_garments
     elif is_removal and existing_garments and new_garments:
-        remove_names = set(g.get("normalized_name", "").lower() for g in new_garments)
-        merged_garments = [g for g in existing_garments if g.get("normalized_name", "").lower() not in remove_names]
+        merged_garments = process_garment_removal(existing_garments, new_garments)
     else:
         merged_garments = new_garments if new_garments else existing_garments
 
     total_count = sum(g.get("quantity", 1) for g in merged_garments)
+    
+    if total_count == 0:
+        send_text_message(state["phone_number"], "Your garments list is now empty. Please list the clothes you would like to schedule for pickup! (e.g., '3 shirts for dry clean')")
+        return {
+            "current_state": "PICKUP_AWAITING_ITEMS",
+            "garments_list": [],
+            "item_count": 0,
+            "response_sent": True
+        }
     
     base_estimate = 0.0
     with SessionLocal() as db:
