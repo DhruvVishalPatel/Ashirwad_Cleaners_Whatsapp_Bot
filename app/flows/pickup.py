@@ -150,6 +150,18 @@ def process_garment_removal(existing_garments: list, remove_garments: list) -> l
                 
     return updated
 
+def build_items_summary(garments_list: list) -> str:
+    if not garments_list:
+        return ""
+    lines = []
+    for g in garments_list:
+        service = g.get("service_category", "dry_clean").replace("_", " ").title()
+        name = g.get("normalized_name", "Item")
+        qty = g.get("quantity", 1)
+        lines.append(f"• {qty}x {name} ({service})")
+    total_qty = sum(g.get("quantity", 1) for g in garments_list)
+    return f"🧺 *Order Breakdown ({total_qty} items)*:\n" + "\n".join(lines) + "\n\n"
+
 def pickup_items_node(state: dict) -> Dict[str, Any]:
     """
     Processes listed clothes using Gemini and generates estimates.
@@ -224,6 +236,7 @@ def pickup_items_node(state: dict) -> Dict[str, Any]:
         promo_msg = ""
         
     final_estimate = base_estimate + delivery_fee
+    items_summary = build_items_summary(merged_garments)
     
     update_dict = {
         "item_count": total_count,
@@ -232,7 +245,8 @@ def pickup_items_node(state: dict) -> Dict[str, Any]:
         "delivery_str": delivery_str,
         "promo_msg": promo_msg,
         "final_estimate": final_estimate,
-        "garments_list": merged_garments
+        "garments_list": merged_garments,
+        "items_summary": items_summary
     }
     
     with SessionLocal() as db:
@@ -246,6 +260,7 @@ def pickup_items_node(state: dict) -> Dict[str, Any]:
         
         combined_msg = prefix + t("POINTS_OFFER", lang, 
                           promo_msg=promo_msg, 
+                          items_summary=items_summary,
                           total_count=total_count, 
                           base_estimate=base_estimate, 
                           delivery_str=delivery_str, 
@@ -281,16 +296,21 @@ def trigger_address_verification(state: dict, state_updates: dict) -> dict:
     points_redeemed = state_updates.get("points_redeemed", state.get("points_redeemed", 0))
     prefix = state_updates.get("direct_order_prefix", state.get("direct_order_prefix", ""))
     
+    garments_list = state_updates.get("garments_list", state.get("garments_list", []))
+    items_summary = build_items_summary(garments_list)
+    
     if points_redeemed > 0:
         final_estimate -= points_redeemed
         promo_msg += t("POINTS_APPLIED_MSG", lang, points_redeemed=points_redeemed)
         
     state_updates["final_estimate"] = final_estimate
     state_updates["promo_msg"] = promo_msg
+    state_updates["items_summary"] = items_summary
     
     if saved_address:
         state_updates["saved_address"] = saved_address
         combined_msg = prefix + t("ADDRESS_CONFIRMATION_SAVED", lang,
+                         items_summary=items_summary,
                          base_estimate=base_estimate,
                          delivery_str=delivery_str,
                          promo_msg=promo_msg,
@@ -304,6 +324,7 @@ def trigger_address_verification(state: dict, state_updates: dict) -> dict:
         state_updates["current_state"] = "PICKUP_AWAITING_ADDRESS_BUTTON"
     else:
         combined_msg = prefix + t("ADDRESS_CONFIRMATION_NEW", lang,
+                         items_summary=items_summary,
                          base_estimate=base_estimate,
                          delivery_str=delivery_str,
                          promo_msg=promo_msg,
@@ -428,7 +449,8 @@ def pickup_address_node(state: dict) -> Dict[str, Any]:
         )
         order_id = order.order_id
     
-    send_text_message(state["phone_number"], t("ORDER_SUCCESS", lang, order_id=order_id))
+    items_summary = build_items_summary(state.get("garments_list", []))
+    send_text_message(state["phone_number"], t("ORDER_SUCCESS", lang, order_id=order_id, items_summary=items_summary))
     
     return {
         "current_flow": "IDLE",

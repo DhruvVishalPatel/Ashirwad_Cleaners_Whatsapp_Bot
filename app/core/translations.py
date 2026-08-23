@@ -80,9 +80,9 @@ TRANSLATIONS = {
         "GUJLISH": "\nPickup schedule karva mate, khali 'Pickup' reply karo!"
     },
     "POINTS_OFFER": {
-        "ENGLISH": "{promo_msg}Got it! Your estimated bill for {total_count} items is approx ₹{base_estimate} + {delivery_str} (Delivery) = ₹{final_estimate}.\n\n🎁 You have **{available_points} Ashirwad Points** available!\nWould you like to redeem {max_redeemable} points for a ₹{max_redeemable} discount on this order?",
-        "HINGLISH": "{promo_msg}Samajh gaya! Aapka {total_count} items ka estimate lagbhag ₹{base_estimate} + {delivery_str} (Delivery) = ₹{final_estimate} hai.\n\n🎁 Aapke paas **{available_points} Ashirwad Points** hain!\nKya aap is order par ₹{max_redeemable} ke discount ke liye {max_redeemable} points redeem karna chahenge?",
-        "GUJLISH": "{promo_msg}Samji gayo! Aapna {total_count} items no andajit bill ₹{base_estimate} + {delivery_str} (Delivery) = ₹{final_estimate} che.\n\n🎁 Aapni pase **{available_points} Ashirwad Points** che!\nSu tame aa order par ₹{max_redeemable} na discount mate {max_redeemable} points redeem karva mangso?"
+        "ENGLISH": "{promo_msg}{items_summary}Your estimated bill for {total_count} items is approx ₹{base_estimate} + {delivery_str} (Delivery) = ₹{final_estimate}.\n\n🎁 You have **{available_points} Ashirwad Points** available!\nWould you like to redeem {max_redeemable} points for a ₹{max_redeemable} discount on this order?",
+        "HINGLISH": "{promo_msg}{items_summary}Aapka {total_count} items ka estimate lagbhag ₹{base_estimate} + {delivery_str} (Delivery) = ₹{final_estimate} hai.\n\n🎁 Aapke paas **{available_points} Ashirwad Points** hain!\nKya aap is order par ₹{max_redeemable} ke discount ke liye {max_redeemable} points redeem karna chahenge?",
+        "GUJLISH": "{promo_msg}{items_summary}Aapna {total_count} items no andajit bill ₹{base_estimate} + {delivery_str} (Delivery) = ₹{final_estimate} che.\n\n🎁 Aapni pase **{available_points} Ashirwad Points** che!\nSu tame aa order par ₹{max_redeemable} na discount mate {max_redeemable} points redeem karva mangso?"
     },
     "POINTS_BUTTON_YES": {
         "ENGLISH": "✅ Redeem ₹{max_redeemable}",
@@ -100,9 +100,9 @@ TRANSLATIONS = {
         "GUJLISH": "✅ **Points Applied**: -₹{points_redeemed} discount!\n"
     },
     "ADDRESS_CONFIRMATION_SAVED": {
-        "ENGLISH": "👕 *Garments Estimate*: ₹{base_estimate}\n🚚 *Delivery Charge*: {delivery_str}\n{promo_msg}**Total Estimate: ₹{final_estimate}**\n\n*Policy Check*: Color, kasab, and zhumka work are handled at owner's risk.\n\n🏠 We will pick this up from your saved address:\n*{saved_address}*",
-        "HINGLISH": "👕 *Garments Estimate*: ₹{base_estimate}\n🚚 *Delivery Charge*: {delivery_str}\n{promo_msg}**Total Estimate: ₹{final_estimate}**\n\n*Policy Check*: Color, kasab, aur zhumka work customer ke risk par rahega.\n\n🏠 Hum aapke saved address se pickup karenge:\n*{saved_address}*",
-        "GUJLISH": "👕 *Garments Estimate*: ₹{base_estimate}\n🚚 *Delivery Charge*: {delivery_str}\n{promo_msg}**Total Estimate: ₹{final_estimate}**\n\n*Policy Check*: Color, kasab, ane zhumka work customer na risk par rahese.\n\n🏠 Ame aapna saved address parthi pickup karishu:\n*{saved_address}*"
+        "ENGLISH": "{items_summary}👕 *Garments Estimate*: ₹{base_estimate}\n🚚 *Delivery Charge*: {delivery_str}\n{promo_msg}**Total Estimate: ₹{final_estimate}**\n\n*Policy Check*: Color, kasab, and zhumka work are handled at owner's risk.\n\n🏠 We will pick this up from your saved address:\n*{saved_address}*",
+        "HINGLISH": "{items_summary}👕 *Garments Estimate*: ₹{base_estimate}\n🚚 *Delivery Charge*: {delivery_str}\n{promo_msg}**Total Estimate: ₹{final_estimate}**\n\n*Policy Check*: Color, kasab, aur zhumka work customer ke risk par rahega.\n\n🏠 Hum aapke saved address se pickup karenge:\n*{saved_address}*",
+        "GUJLISH": "{items_summary}👕 *Garments Estimate*: ₹{base_estimate}\n🚚 *Delivery Charge*: {delivery_str}\n{promo_msg}**Total Estimate: ₹{final_estimate}**\n\n*Policy Check*: Color, kasab, ane zhumka work customer na risk par rahese.\n\n🏠 Ame aapna saved address parthi pickup karishu:\n*{saved_address}*"
     },
     "ADDRESS_BUTTON_YES": {
         "ENGLISH": "✅ Yes, use this",
@@ -115,9 +115,9 @@ TRANSLATIONS = {
         "GUJLISH": "📝 Navu Address"
     },
     "ADDRESS_CONFIRMATION_NEW": {
-        "ENGLISH": "👕 *Garments Estimate*: ₹{base_estimate}\n🚚 *Delivery Charge*: {delivery_str}\n{promo_msg}**Total Estimate: ₹{final_estimate}**\n\n*Policy Check*: Color, kasab, and zhumka work are handled at owner's risk.\n\n📍 **Note: We currently ONLY offer pickup and delivery in the Paldi area.**\n\nTo accept this policy and confirm your order, please reply with your exact Paldi address (Flat/House Number and Building Name) or share your WhatsApp location pin.",
-        "HINGLISH": "👕 *Garments Estimate*: ₹{base_estimate}\n🚚 *Delivery Charge*: {delivery_str}\n{promo_msg}**Total Estimate: ₹{final_estimate}**\n\n*Policy Check*: Color, kasab, aur zhumka work customer ke risk par rahega.\n\n📍 **Note: Hum abhi sirf Paldi area mein pickup aur delivery dete hain.**\n\nIs policy ko accept karne aur order confirm karne ke liye, kripya apna exact Paldi address (Flat/House Number aur Building Name) reply karein ya WhatsApp location pin share karein.",
-        "GUJLISH": "👕 *Garments Estimate*: ₹{base_estimate}\n🚚 *Delivery Charge*: {delivery_str}\n{promo_msg}**Total Estimate: ₹{final_estimate}**\n\n*Policy Check*: Color, kasab, ane zhumka work customer na risk par rahese.\n\n📍 **Note: Ame atyare khali Paldi area ma j pickup ane delivery apiye chhiye.**\n\nAa policy accept karva ane order confirm karva mate, kripa kari aapno exact Paldi address (Flat/House Number ane Building Name) reply karo ke WhatsApp location pin share karo."
+        "ENGLISH": "{items_summary}👕 *Garments Estimate*: ₹{base_estimate}\n🚚 *Delivery Charge*: {delivery_str}\n{promo_msg}**Total Estimate: ₹{final_estimate}**\n\n*Policy Check*: Color, kasab, and zhumka work are handled at owner's risk.\n\n📍 **Note: We currently ONLY offer pickup and delivery in the Paldi area.**\n\nTo accept this policy and confirm your order, please reply with your exact Paldi address (Flat/House Number and Building Name) or share your WhatsApp location pin.",
+        "HINGLISH": "{items_summary}👕 *Garments Estimate*: ₹{base_estimate}\n🚚 *Delivery Charge*: {delivery_str}\n{promo_msg}**Total Estimate: ₹{final_estimate}**\n\n*Policy Check*: Color, kasab, aur zhumka work customer ke risk par rahega.\n\n📍 **Note: Hum abhi sirf Paldi area mein pickup aur delivery dete hain.**\n\nIs policy ko accept karne aur order confirm karne ke liye, kripya apna exact Paldi address (Flat/House Number aur Building Name) reply karein ya WhatsApp location pin share karein.",
+        "GUJLISH": "{items_summary}👕 *Garments Estimate*: ₹{base_estimate}\n🚚 *Delivery Charge*: {delivery_str}\n{promo_msg}**Total Estimate: ₹{final_estimate}**\n\n*Policy Check*: Color, kasab, ane zhumka work customer na risk par rahese.\n\n📍 **Note: Ame atyare khali Paldi area ma j pickup ane delivery apiye chhiye.**\n\nAa policy accept karva ane order confirm karva mate, kripa kari aapno exact Paldi address (Flat/House Number ane Building Name) reply karo ke WhatsApp location pin share karo."
     },
     "ADDRESS_INPUT_NEW_REQUEST": {
         "ENGLISH": "Please reply with your new exact address (Flat/House Number and Building Name) or share your WhatsApp location pin.",
@@ -130,9 +130,9 @@ TRANSLATIONS = {
         "GUJLISH": "Kripa kari buttons mathi koi ek par tap karo."
     },
     "ORDER_SUCCESS": {
-        "ENGLISH": "Thank you! Your order {order_id} has been created successfully. We will be at your location soon!",
-        "HINGLISH": "Shukriya! Aapka order {order_id} safaltapurvak ban gaya hai. Hum jald hi aapke address par honge!",
-        "GUJLISH": "Aabhar! Aapno order {order_id} safaltapurvak bani gayo che. Ame jaldi thi aapna address par pahonchishu!"
+        "ENGLISH": "Thank you! Your order {order_id} has been created successfully.\n\n{items_summary}We will be at your location soon!",
+        "HINGLISH": "Shukriya! Aapka order {order_id} safaltapurvak ban gaya hai.\n\n{items_summary}Hum jald hi aapke address par honge!",
+        "GUJLISH": "Aabhar! Aapno order {order_id} safaltapurvak bani gayo che.\n\n{items_summary}Ame jaldi thi aapna address par pahonchishu!"
     },
     "STATUS_NO_ORDERS": {
         "ENGLISH": "You don't have any active orders right now. Would you like to schedule a pickup? Just say 'Pickup'!",
