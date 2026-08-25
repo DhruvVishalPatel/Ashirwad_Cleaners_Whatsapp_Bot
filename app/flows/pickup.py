@@ -19,7 +19,8 @@ from app.services.crud import (
     get_customer_saved_address,
     update_customer_saved_address,
     get_monthly_order_count,
-    get_available_points
+    get_available_points,
+    clean_order_id
 )
 
 def match_button_synonym(text: str, state: str) -> str:
@@ -55,6 +56,13 @@ def extract_coords_from_url(url: str):
 
 def is_in_paldi_coordinate(lat: float, lon: float) -> bool:
     return (23.000 <= lat <= 23.028) and (72.550 <= lon <= 72.580)
+
+def is_after_hours() -> bool:
+    from zoneinfo import ZoneInfo
+    from datetime import datetime, time
+    ist = ZoneInfo("Asia/Kolkata")
+    now = datetime.now(ist)
+    return not (time(9, 0) <= now.time() <= time(20, 30))
 
 def is_in_paldi_text(address: str) -> bool:
     return "paldi" in address.lower()
@@ -163,7 +171,7 @@ def build_items_summary(garments_list: list) -> str:
     lines = []
     for g in garments_list:
         service = g.get("service_category", "dry_clean").replace("_", " ").title()
-        name = g.get("normalized_name", "Item")
+        name = g.get("normalized_name") or g.get("item_name") or g.get("garment_type") or "Item"
         qty = g.get("quantity", 1)
         lines.append(f"• {qty}x {name} ({service})")
     total_qty = sum(g.get("quantity", 1) for g in garments_list)
@@ -452,12 +460,40 @@ def pickup_address_node(state: dict) -> Dict[str, Any]:
             points_redeemed=state["points_redeemed"],
             special_instructions="None", 
             disclaimer_accepted=True,
-            garments_list=state["garments_list"]
+            garments_list=state.get("garments_list", [])
         )
-        order_id = order.order_id
-    
+        order_id = clean_order_id(order.order_id)
+        
     items_summary = build_items_summary(state.get("garments_list", []))
-    send_text_message(state["phone_number"], t("ORDER_SUCCESS", lang, order_id=order_id, items_summary=items_summary))
+    
+    delivery_fee = state.get("delivery_fee", 0.0)
+    if delivery_fee == 0.0:
+        delivery_str = "₹0 (Waived!)"
+    else:
+        delivery_str = f"₹{delivery_fee:.0f}"
+        
+    points_redeemed = state.get("points_redeemed", 0)
+    if points_redeemed > 0:
+        promo_msg = t("POINTS_APPLIED_MSG", lang, points_redeemed=points_redeemed)
+    else:
+        promo_msg = ""
+        
+    after_hours_note = t("AFTER_HOURS_NOTE", lang) if is_after_hours() else ""
+    
+    send_text_message(
+        state["phone_number"], 
+        t("ORDER_SUCCESS", 
+          lang, 
+          order_id=order_id, 
+          items_summary=items_summary,
+          base_estimate=f"{state.get('base_estimate', 0.0):.1f}",
+          delivery_str=delivery_str,
+          promo_msg=promo_msg,
+          final_estimate=f"{state.get('final_estimate', 0.0):.1f}",
+          saved_address=flat_address,
+          after_hours_note=after_hours_note
+        )
+    )
     
     return {
         "current_flow": "IDLE",

@@ -61,14 +61,8 @@ def process_whatsapp_message(payload: dict):
             customer_name = customer.name or ""
             lang = customer.preferred_language or ""
             
-        lang_for_warning = lang if lang else "ENGLISH"
-
-        # Working Hours Check (9:00 AM to 8:30 PM IST)
-        ist = ZoneInfo("Asia/Kolkata")
-        now = datetime.now(ist)
-        if not (time(9, 0) <= now.time() <= time(20, 30)):
-            send_text_message(phone_number, t("CLOSED_WARNING", lang_for_warning))
-            return
+        # 24/7 Order Processing Enabled
+        # (After-hours pickup notifications are attached to order confirmations)
         
         # Handle Interactive vs Text vs Location
         if message.get("type") == "interactive":

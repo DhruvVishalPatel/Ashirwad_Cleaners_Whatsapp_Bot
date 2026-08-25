@@ -134,10 +134,15 @@ TRANSLATIONS = {
         "HINGLISH": "Kripya buttons mein se kisi ek par tap karein.",
         "GUJLISH": "Kripa kari buttons mathi koi ek par tap karo."
     },
+    "AFTER_HOURS_NOTE": {
+        "ENGLISH": "🌙 *After-Hours Pickup Note*: Our shop operating hours are 9:00 AM – 8:30 PM. Your order has been registered, and our runner will arrive to pick up your garments tomorrow morning after 9:00 AM!\n\n",
+        "HINGLISH": "🌙 *After-Hours Pickup Note*: Aapka order register ho gaya hai! Humari shop abhi band hai (Hours: 9:00 AM – 8:30 PM), humari team kal subah 9:00 AM ke baad aapka pickup kar legi.\n\n",
+        "GUJLISH": "🌙 *After-Hours Pickup Note*: Aapno order register thai gayo che! Amari shop atyare band che (Samay: 9:00 AM – 8:30 PM), amari team kal savere 9:00 AM pachhi aapno pickup kari lese.\n\n"
+    },
     "ORDER_SUCCESS": {
-        "ENGLISH": "Thank you! Your order {order_id} has been created successfully.\n\n{items_summary}We will be at your location soon!",
-        "HINGLISH": "Shukriya! Aapka order {order_id} safaltapurvak ban gaya hai.\n\n{items_summary}Hum jald hi aapke address par honge!",
-        "GUJLISH": "Aabhar! Aapno order {order_id} safaltapurvak bani gayo che.\n\n{items_summary}Ame jaldi thi aapna address par pahonchishu!"
+        "ENGLISH": "🎉 *Order #{order_id} Confirmed!* 🎉\n\n{items_summary}👕 *Garments Estimate*: ₹{base_estimate}\n🚚 *Delivery Charge*: {delivery_str}\n{promo_msg}**Total Estimate: ₹{final_estimate}**\n\n🏠 *Pickup Address*:\n{saved_address}\n\n{after_hours_note}Thank you for choosing Ashirwad Cleaners!",
+        "HINGLISH": "🎉 *Order #{order_id} Confirm Ho Gaya Hai!* 🎉\n\n{items_summary}👕 *Garments Estimate*: ₹{base_estimate}\n🚚 *Delivery Charge*: {delivery_str}\n{promo_msg}**Total Estimate: ₹{final_estimate}**\n\n🏠 *Pickup Address*:\n{saved_address}\n\n{after_hours_note}Ashirwad Cleaners ko chunne ke liye shukriya!",
+        "GUJLISH": "🎉 *Order #{order_id} Confirm Thai Gayo Che!* 🎉\n\n{items_summary}👕 *Garments Estimate*: ₹{base_estimate}\n🚚 *Delivery Charge*: {delivery_str}\n{promo_msg}**Total Estimate: ₹{final_estimate}**\n\n🏠 *Pickup Address*:\n{saved_address}\n\n{after_hours_note}Ashirwad Cleaners ne pasand karva mate aabhar!"
     },
     "STATUS_NO_ORDERS": {
         "ENGLISH": "You don't have any active orders right now. Would you like to schedule a pickup? Just say 'Pickup'!",
