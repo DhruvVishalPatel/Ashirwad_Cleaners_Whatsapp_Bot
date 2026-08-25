@@ -6,8 +6,12 @@ from app.models.schemas import Customer, Order, OrderItem, Runner, PointTransact
 def get_customer(db: Session, phone_number: str):
     return db.query(Customer).filter(Customer.phone_number == phone_number).first()
 
-def create_customer(db: Session, phone_number: str, name: str = None):
-    db_customer = Customer(phone_number=phone_number, name=name)
+def create_customer(db: Session, phone_number: str, name: str = None, preferred_language: str = "ENGLISH"):
+    db_customer = Customer(
+        phone_number=phone_number, 
+        name=name, 
+        preferred_language=preferred_language or "ENGLISH"
+    )
     db.add(db_customer)
     db.commit()
     db.refresh(db_customer)

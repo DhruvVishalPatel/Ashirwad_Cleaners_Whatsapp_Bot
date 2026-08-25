@@ -34,7 +34,7 @@ class Customer(Base):
     saved_address = Column(String, nullable=True)
     last_location_gps = Column(String, nullable=True) # e.g., "lat,long"
     order_count = Column(Integer, default=0)
-    preferred_language = Column(String, nullable=True)
+    preferred_language = Column(String, default="ENGLISH", nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     
     orders = relationship("Order", back_populates="customer")

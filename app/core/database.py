@@ -41,6 +41,7 @@ def init_db():
         db.rollback()
 
     try:
+        db.execute(text("UPDATE customers SET preferred_language = 'ENGLISH' WHERE preferred_language IS NULL"))
         db.execute(text("UPDATE orders SET order_id = REPLACE(order_id, 'AC-', '') WHERE order_id LIKE 'AC-%'"))
         db.execute(text("UPDATE orders SET order_id = REPLACE(order_id, 'AC', '') WHERE order_id LIKE 'AC%'"))
         db.execute(text("UPDATE order_items SET order_id = REPLACE(order_id, 'AC-', '') WHERE order_id LIKE 'AC-%'"))
