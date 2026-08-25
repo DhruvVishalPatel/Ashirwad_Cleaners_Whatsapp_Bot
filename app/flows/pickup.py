@@ -188,8 +188,10 @@ def pickup_items_node(state: dict) -> Dict[str, Any]:
     
     estimate_data = generate_estimate(text, lang)
     
-    if estimate_data.get("is_question"):
-        send_text_message(state["phone_number"], f"{estimate_data.get('reply')}{t('ESTIMATE_QUESTION_SUFFIX', lang)}")
+    if estimate_data.get("is_question") and not estimate_data.get("garments"):
+        reply_msg = estimate_data.get('reply') or ""
+        msg_to_send = reply_msg if reply_msg else t('ESTIMATE_QUESTION_SUFFIX', lang).lstrip()
+        send_text_message(state["phone_number"], msg_to_send)
         return {
             "current_state": "PICKUP_AWAITING_ITEMS",
             "response_sent": True
