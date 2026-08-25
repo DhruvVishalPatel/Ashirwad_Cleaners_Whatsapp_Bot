@@ -234,6 +234,7 @@ def classifier_node(state: BotState) -> Dict[str, Any]:
     logger.info(f"[ClassifierNode] Output. Routed to Flow: {next_flow}, Language: {user_lang}")
     return {
         "current_flow": next_flow,
+        "current_state": "",
         "language": user_lang,
         "response_sent": False
     }
@@ -270,7 +271,7 @@ def route_next_node(state: BotState) -> str:
     return END
 
 def route_after_node(state: BotState) -> str:
-    if state.get("response_sent") or state.get("current_state") in ["PICKUP_AWAITING_ITEMS", "PICKUP_AWAITING_POINTS_REDEEM", "PICKUP_AWAITING_ADDRESS_BUTTON", "PICKUP_AWAITING_CONFIRMATION_ADDRESS"]:
+    if state.get("response_sent"):
         logger.info("[route_after_node] Response sent to user. Terminating graph execution run (END).")
         return END
     next_node = route_next_node(state)

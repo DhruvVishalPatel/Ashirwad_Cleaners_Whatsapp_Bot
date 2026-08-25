@@ -96,6 +96,7 @@ def pickup_name_node(state: dict) -> Dict[str, Any]:
                 "text_input": pending_items,
                 "pending_items_input": "",
                 "direct_order_prefix": t("NEW_CUSTOMER_PREFIX", lang, name=name),
+                "current_flow": "PICKUP",
                 "current_state": "PICKUP_AWAITING_ITEMS",
                 "response_sent": False
             }
@@ -104,6 +105,7 @@ def pickup_name_node(state: dict) -> Dict[str, Any]:
         send_text_message(state["phone_number"], t("NEW_CUSTOMER_WELCOME", lang, name=name))
         return {
             "customer_name": name,
+            "current_flow": "PICKUP",
             "current_state": "PICKUP_AWAITING_ITEMS",
             "response_sent": True
         }
