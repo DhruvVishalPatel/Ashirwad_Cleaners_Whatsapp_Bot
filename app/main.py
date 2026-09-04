@@ -44,7 +44,9 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Mount built frontend if dist directory exists
 if os.path.exists("frontend/dist"):
-    app.mount("/admin", StaticFiles(directory="frontend/dist", html=True), name="frontend")
+    app.mount("/admin", StaticFiles(directory="frontend/dist", html=True), name="frontend_admin")
+    app.mount("/", StaticFiles(directory="frontend/dist", html=True), name="frontend_root")
+
 
 
 VERIFY_TOKEN = os.environ.get("VERIFY_TOKEN", "YOUR_CUSTOM_VERIFY_TOKEN")
