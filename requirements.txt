@@ -10,3 +10,5 @@ requests
 psycopg2-binary
 langgraph
 langgraph-checkpoint-sqlite
+websockets
+
