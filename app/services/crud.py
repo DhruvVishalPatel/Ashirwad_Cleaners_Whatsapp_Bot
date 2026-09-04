@@ -1,3 +1,4 @@
+from typing import Any, List, Dict, Optional
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 from app.models.schemas import Customer, Order, OrderItem, Runner, PointTransaction, OrderType
@@ -5,8 +6,12 @@ from app.models.schemas import Customer, Order, OrderItem, Runner, PointTransact
 def get_customer(db: Session, phone_number: str):
     return db.query(Customer).filter(Customer.phone_number == phone_number).first()
 
-def create_customer(db: Session, phone_number: str, name: str = None):
-    db_customer = Customer(phone_number=phone_number, name=name)
+def create_customer(db: Session, phone_number: str, name: str = None, preferred_language: str = "ENGLISH"):
+    db_customer = Customer(
+        phone_number=phone_number, 
+        name=name, 
+        preferred_language=preferred_language or "ENGLISH"
+    )
     db.add(db_customer)
     db.commit()
     db.refresh(db_customer)
@@ -53,7 +58,9 @@ def get_monthly_order_count(db: Session, customer_id: int):
     ).count()
 
 def get_available_points(db: Session, customer_id: int) -> int:
-    transactions = db.query(PointTransaction).filter(PointTransaction.customer_id == customer_id).order_by(PointTransaction.created_at.asc()).all()
+    transactions = db.query(PointTransaction).filter(
+        PointTransaction.customer_id == customer_id
+    ).order_by(PointTransaction.created_at.asc()).all()
     now = datetime.utcnow()
     
     buckets = []
@@ -63,16 +70,17 @@ def get_available_points(db: Session, customer_id: int) -> int:
         elif t.transaction_type == "REDEEMED":
             points_to_deduct = t.points
             for b in buckets:
-                if b['amount'] > 0:
+                # Deduct only from buckets that were unexpired at the time of redemption
+                if b['amount'] > 0 and (b['expires_at'] is None or b['expires_at'] > t.created_at):
                     deduct = min(b['amount'], points_to_deduct)
                     b['amount'] -= deduct
                     points_to_deduct -= deduct
-                if points_to_deduct == 0:
-                    break
+                    if points_to_deduct == 0:
+                        break
                     
-    # Sum only unexpired points
-    available = sum(b['amount'] for b in buckets if b['amount'] > 0 and b['expires_at'] > now)
-    return available
+    # Sum only unexpired points as of now
+    available = sum(b['amount'] for b in buckets if b['amount'] > 0 and (b['expires_at'] is None or b['expires_at'] > now))
+    return max(0, available)
 
 def add_points_transaction(db: Session, customer_id: int, points: int, transaction_type: str, order_id: str = None):
     expires_at = None
@@ -89,45 +97,92 @@ def add_points_transaction(db: Session, customer_id: int, points: int, transacti
     db.add(pt)
     db.commit()
 
+def clean_order_id(order_id: Any) -> str:
+    if not order_id:
+        return ""
+    s = str(order_id).strip()
+    if s.startswith("AC-"):
+        return s[3:]
+    if s.startswith("AC"):
+        return s[2:]
+    return s
+
+def _generate_next_order_id(db: Session) -> str:
+    existing_ids = db.query(Order.order_id).all()
+    max_num = 1000
+    for (o_id,) in existing_ids:
+        try:
+            digits = ''.join(filter(str.isdigit, o_id or ""))
+            if digits:
+                num = int(digits)
+                if num > max_num:
+                    max_num = num
+        except ValueError:
+            pass
+    return str(max_num + 1)
+
+def now_ist() -> datetime:
+    from datetime import datetime, timezone, timedelta
+    return datetime.now(timezone.utc).astimezone(timezone(timedelta(hours=5, minutes=30))).replace(tzinfo=None)
+
 def create_order(db: Session, customer_id: int, item_count: int, order_type: str = "PICKUP", service_category: str = None, flat_address: str = None, estimated_amount: float = None, delivery_fee: float = 0.0, points_redeemed: int = 0, special_instructions: str = None, disclaimer_accepted: bool = True, garments_list: list = None):
-    # Generate ID based on row count
-    count = db.query(Order).count()
-    order_id = f"AC-{1001 + count}"
-    
-    db_order = Order(
-        order_id=order_id,
-        customer_id=customer_id,
-        item_count=item_count,
-        order_type=OrderType[order_type],
-        service_category=service_category,
-        flat_address=flat_address,
-        estimated_amount=estimated_amount,
-        delivery_fee=delivery_fee,
-        points_redeemed=points_redeemed,
-        special_instructions=special_instructions,
-        disclaimer_accepted=disclaimer_accepted
-    )
-    db.add(db_order)
-    db.commit()
-    db.refresh(db_order)
-    
-    # Add OrderItems if provided
-    if garments_list:
-        for item in garments_list:
-            oi = OrderItem(
-                order_id=db_order.order_id,
-                garment_type=item.get("normalized_name", "Unknown"),
-                service_type=item.get("service_category", "Dry Clean"),
-                quantity=item.get("quantity", 1)
+    from sqlalchemy.exc import IntegrityError
+
+    for _ in range(5):
+        order_id = _generate_next_order_id(db)
+        try:
+            db_order = Order(
+                order_id=order_id,
+                customer_id=customer_id,
+                item_count=item_count,
+                order_type=OrderType[order_type],
+                service_category=service_category,
+                flat_address=flat_address,
+                estimated_amount=estimated_amount,
+                delivery_fee=delivery_fee,
+                points_redeemed=points_redeemed,
+                special_instructions=special_instructions,
+                disclaimer_accepted=disclaimer_accepted,
+                created_at=now_ist()
             )
-            db.add(oi)
-        db.commit()
-    
-    # If points were redeemed, log the transaction
-    if points_redeemed > 0:
-        add_points_transaction(db, customer_id, points_redeemed, "REDEEMED", db_order.order_id)
-        
-    return db_order
+            db.add(db_order)
+            db.commit()
+            db.refresh(db_order)
+            
+            # Add OrderItems if provided
+            if garments_list:
+                for item in garments_list:
+                    oi = OrderItem(
+                        order_id=db_order.order_id,
+                        garment_type=item.get("normalized_name", "Unknown"),
+                        service_type=item.get("service_category", "Dry Clean"),
+                        quantity=item.get("quantity", 1)
+                    )
+                    db.add(oi)
+                db.commit()
+            
+            # If points were redeemed, log the transaction
+            if points_redeemed > 0:
+                add_points_transaction(db, customer_id, points_redeemed, "REDEEMED", db_order.order_id)
+                
+            # Broadcast real-time WebSocket event to admin dashboard
+            try:
+                from app.core.ws_manager import broadcast_event_sync
+                broadcast_event_sync("ORDER_CREATED", {
+                    "order_id": db_order.order_id,
+                    "customer_id": customer_id,
+                    "item_count": item_count,
+                    "service_category": service_category
+                })
+            except Exception:
+                pass
+
+            return db_order
+        except IntegrityError:
+            db.rollback()
+            continue
+
+    raise RuntimeError("Failed to generate a unique order ID after 5 attempts.")
 
 def get_runners(db: Session):
     return db.query(Runner).all()

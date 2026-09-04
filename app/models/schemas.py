@@ -34,7 +34,7 @@ class Customer(Base):
     saved_address = Column(String, nullable=True)
     last_location_gps = Column(String, nullable=True) # e.g., "lat,long"
     order_count = Column(Integer, default=0)
-    preferred_language = Column(String, default="ENGLISH", nullable=False)
+    preferred_language = Column(String, default="ENGLISH", nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     
     orders = relationship("Order", back_populates="customer")
@@ -55,7 +55,7 @@ class PointTransaction(Base):
 
 class Order(Base):
     __tablename__ = 'orders'
-    order_id = Column(String, primary_key=True, index=True) # e.g., "AC-1001"
+    order_id = Column(String, primary_key=True, index=True) # e.g., "1001"
     customer_id = Column(Integer, ForeignKey('customers.customer_id'), nullable=False)
     order_type = Column(Enum(OrderType), default=OrderType.PICKUP, nullable=False)
     status = Column(Enum(OrderStatus), default=OrderStatus.PENDING_PICKUP, nullable=False)
@@ -72,9 +72,11 @@ class Order(Base):
     points_redeemed = Column(Integer, default=0)
     special_instructions = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    picked_up_at = Column(DateTime, nullable=True)
+    delivered_at = Column(DateTime, nullable=True)
     
     customer = relationship("Customer", back_populates="orders")
-    items = relationship("OrderItem", back_populates="order")
+    items = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
 
 class OrderItem(Base):
     __tablename__ = 'order_items'
@@ -92,3 +94,12 @@ class Runner(Base):
     runner_id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False)
     phone_number = Column(String, unique=True, index=True, nullable=False)
+
+class CatalogItem(Base):
+    __tablename__ = 'catalog_items'
+    id = Column(Integer, primary_key=True, index=True)
+    service_type = Column(String, nullable=False) # e.g. "dry_clean", "washing", "steam_press", "petrol_wash"
+    item_name = Column(String, nullable=False)
+    price = Column(Float, nullable=False)
+    is_variable = Column(Boolean, default=False)
+    note = Column(String, nullable=True)

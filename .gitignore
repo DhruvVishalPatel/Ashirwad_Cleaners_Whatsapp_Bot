@@ -62,7 +62,18 @@ venv.bak/
 
 # Databases
 *.db
+*.db-shm
+*.db-wal
 *.sqlite3
 
 # Streamlit
 .streamlit/
+
+# Log files
+logs/
+*.log
+
+# Node.js frontend
+frontend/node_modules/
+frontend/dist/
+

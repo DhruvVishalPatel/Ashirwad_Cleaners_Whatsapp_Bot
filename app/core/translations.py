@@ -1,23 +1,58 @@
 TRANSLATIONS = {
+    "ASK_LANGUAGE": {
+        "ENGLISH": "🙏 Welcome to Ashirwad Cleaners!\nPlease select your preferred language to continue:\n\nAshirwad Cleaners mein aapka swagat hai! Kripya apni bhasha chunein:\n\nAshirwad Cleaners ma aapnu swagat che! Kripa kari aapni bhasha pasand karo:",
+        "HINGLISH": "🙏 Welcome to Ashirwad Cleaners!\nPlease select your preferred language to continue:\n\nAshirwad Cleaners mein aapka swagat hai! Kripya apni bhasha chunein:\n\nAshirwad Cleaners ma aapnu swagat che! Kripa kari aapni bhasha pasand karo:",
+        "GUJLISH": "🙏 Welcome to Ashirwad Cleaners!\nPlease select your preferred language to continue:\n\nAshirwad Cleaners mein aapka swagat hai! Kripya apni bhasha chunein:\n\nAshirwad Cleaners ma aapnu swagat che! Kripa kari aapni bhasha pasand karo:"
+    },
     "LOYALTY_BONUS_PROMO": {
         "ENGLISH": "🎉 *Loyalty Bonus*: Since this is your 5th+ order this month, your ₹30 Delivery Fee is completely waived!\n\n",
         "HINGLISH": "🎉 *Loyalty Bonus*: Kyunki yeh aapka is mahine ka 5th+ order hai, aapki ₹30 Delivery Fee maaf hai!\n\n",
         "GUJLISH": "🎉 *Loyalty Bonus*: Kem ke aa aapno aa mahina no 5th+ order che, aapni ₹30 Delivery Fee maf che!\n\n"
     },
     "WELCOME_MSG": {
-        "ENGLISH": "🙏 Namaste! Welcome to Ashirwad Cleaners.\nWe are here to take care of your favorite garments—from daily wear to heavy festive sarees, sherwanis, and household blankets. \nHow can we help you today? Please choose an option below:",
-        "HINGLISH": "🙏 Namaste! Ashirwad Cleaners mein aapka swagat hai.\nHum aapke pasandida kapdo ki dekhbhal ke liye taiyar hain—daily wear se lekar heavy festive sarees, sherwanis, aur blankets tak.\nHum aaj aapki kya madad kar sakte hain? Kripya neeche diye gaye option ko select karein:",
-        "GUJLISH": "🙏 Namaste! Ashirwad Cleaners ma aapnu swagat che.\nAme aapna manpasand kapda ni dekhbhal karva mate taiyar chhiye—daily wear thi laine heavy festive sarees, sherwanis, ane blankets sudhi.\nAme aaj aapni su madad kari shakiye? Kripa kari ne niche aapel options mathi pasand karo:"
+        "ENGLISH": "🙏 Namaste! Welcome to Ashirwad Cleaners.\nWe are here to take care of your favorite garments—from daily wear to heavy festive sarees, sherwanis, and household blankets.\n\nHow can we help you today? Please choose an option below, or feel free to type any query you have:",
+        "HINGLISH": "🙏 Namaste! Ashirwad Cleaners mein aapka swagat hai.\nHum aapke pasandida kapdo ki dekhbhal ke liye taiyar hain—daily wear se lekar heavy festive sarees, sherwanis, aur blankets tak.\n\nHum aaj aapki kya madad kar sakte hain? Kripya neeche diye gaye option ko select karein, ya aap koi bhi query type karke pooch sakte hain:",
+        "GUJLISH": "🙏 Namaste! Ashirwad Cleaners ma aapnu swagat che.\nAme aapna manpasand kapda ni dekhbhal karva mate taiyar chhiye—daily wear thi laine heavy festive sarees, sherwanis, ane blankets sudhi.\n\nAme aaj aapni su madad kari shakiye? Kripa kari niche aapel options mathi pasand karo, ya tame koi pan query type kari ne puchi shako cho:"
+    },
+    "GREETING_BUTTON_PICKUP": {
+        "ENGLISH": "Schedule Pickup",
+        "HINGLISH": "Pickup / Book",
+        "GUJLISH": "Pickup Book Karo"
+    },
+    "GREETING_BUTTON_PRICING": {
+        "ENGLISH": "Check Pricing",
+        "HINGLISH": "Pricing / Rate List",
+        "GUJLISH": "Bhav / Pricing"
+    },
+    "GREETING_BUTTON_STATUS": {
+        "ENGLISH": "Order Status",
+        "HINGLISH": "Order Status / Track",
+        "GUJLISH": "Order Track Karo"
+    },
+    "WELCOME_BACK_PREFIX": {
+        "ENGLISH": "Welcome back, {name}! Let's process your order:\n\n",
+        "HINGLISH": "Ashirwad Cleaners mein aapka fir se swagat hai, {name}! Hum aapki list check kar rahe hain:\n\n",
+        "GUJLISH": "Ashirwad Cleaners ma aapnu feri swagat che, {name}! Ame aapni list check kari rahya chhiye:\n\n"
+    },
+    "NEW_CUSTOMER_PREFIX": {
+        "ENGLISH": "Nice to meet you, {name}! Let's process your order:\n\n",
+        "HINGLISH": "Aapki details check ho gayi hain, {name}! Hum aapki order list check kar rahe hain:\n\n",
+        "GUJLISH": "Khub saras, {name}! Ame aapni order list check kari rahya chhiye:\n\n"
     },
     "ASK_NAME": {
         "ENGLISH": "Great! We'd love to pick up your clothes. What is your name?",
         "HINGLISH": "Bahut badhiya! Hum aapke kapde pick up karne ke liye taiyar hain. Aapka naam kya hai?",
         "GUJLISH": "Khub saras! Ame aapna kapda pick up karva mate taiyar chhiye. Aapnu naam su che?"
     },
+    "NEW_CUSTOMER_WELCOME": {
+        "ENGLISH": "Nice to meet you, {name}! Please list the specific clothes you have and what service they need (e.g., 4 shirts for dry clean, 2 pants for washing).",
+        "HINGLISH": "Aapse milkar khushi hui, {name}! Kripya apne kapdo ki list aur service batayein (jaise: 4 shirts dry clean, 2 pants washing).",
+        "GUJLISH": "Aapne mali ne khub anand thayo, {name}! Kripa kari aapna kapda ni list ane service janavo (jem ke: 4 shirts dry clean, 2 pants washing)."
+    },
     "WELCOME_BACK": {
         "ENGLISH": "Welcome back, {name}! Please list the specific clothes you have and what service they need (e.g., 4 shirts for dry clean, 2 pants for washing).",
-        "HINGLISH": "Ashirwad Cleaners mein aapka fir se swagat hai, {name}! Kripya apne kapdo ki list aur service batayein (jaise ki, 4 shirts dry clean ke liye, 2 pants dhone ke liye).",
-        "GUJLISH": "Ashirwad Cleaners ma aapnu feri swagat che, {name}! Kripa kari aapna kapda ni list ane service janavo (jem ke, 4 shirts dry clean mate, 2 pants dhova mate)."
+        "HINGLISH": "Welcome back, {name}! Kripya apne kapdo ki list aur service batayein (jaise: 4 shirts dry clean, 2 pants washing).",
+        "GUJLISH": "Welcome back, {name}! Kripa kari aapna kapda ni list ane service janavo (jem ke: 4 shirts dry clean, 2 pants washing)."
     },
     "ITEMS_UNDERSTANDING_ERROR": {
         "ENGLISH": "I couldn't understand the items. Could you please list them out clearly? (e.g., '3 shirts for washing')",
@@ -34,6 +69,11 @@ TRANSLATIONS = {
         "HINGLISH": "Humari teen main service categories hain! Aap kaunsi pricing list dekhna chahenge?",
         "GUJLISH": "Amari tran main service categories che! Tame kain pricing list jova mangso?"
     },
+    "PRICING_IMAGE_CAPTION": {
+        "ENGLISH": "📋 Here is our complete price list for all services! Feel free to type any query or start a pickup order anytime.",
+        "HINGLISH": "📋 Yeh rahi humari saari services ki complete price list! Aap isey dekh sakte hain. Kisi bhi inquiry ya pickup ke liye aap kabhi bhi message kar sakte hain.",
+        "GUJLISH": "📋 Aa rahi amari badhi services ni complete price list! Tame aa joi shako cho. Koi pan inquiry ya pickup mate tame game tyare message kari shako cho."
+    },
     "PRICING_AWAIT_SELECTION_ERROR": {
         "ENGLISH": "Please tap one of the category buttons above.",
         "HINGLISH": "Kripya upar diye gaye category buttons mein se ek par tap karein.",
@@ -45,9 +85,9 @@ TRANSLATIONS = {
         "GUJLISH": "\nPickup schedule karva mate, khali 'Pickup' reply karo!"
     },
     "POINTS_OFFER": {
-        "ENGLISH": "{promo_msg}Got it! Your estimated bill for {total_count} items is approx ₹{base_estimate} + {delivery_str} (Delivery) = ₹{final_estimate}.\n\n🎁 You have **{available_points} Ashirwad Points** available!\nWould you like to redeem {max_redeemable} points for a ₹{max_redeemable} discount on this order?",
-        "HINGLISH": "{promo_msg}Samajh gaya! Aapka {total_count} items ka estimate lagbhag ₹{base_estimate} + {delivery_str} (Delivery) = ₹{final_estimate} hai.\n\n🎁 Aapke paas **{available_points} Ashirwad Points** hain!\nKya aap is order par ₹{max_redeemable} ke discount ke liye {max_redeemable} points redeem karna chahenge?",
-        "GUJLISH": "{promo_msg}Samji gayo! Aapna {total_count} items no andajit bill ₹{base_estimate} + {delivery_str} (Delivery) = ₹{final_estimate} che.\n\n🎁 Aapni pase **{available_points} Ashirwad Points** che!\nSu tame aa order par ₹{max_redeemable} na discount mate {max_redeemable} points redeem karva mangso?"
+        "ENGLISH": "{promo_msg}{items_summary}Your estimated bill for {total_count} items is approx ₹{base_estimate} + {delivery_str} (Delivery) = ₹{final_estimate}.\n\n🎁 You have **{available_points} Ashirwad Points** available!\nWould you like to redeem {max_redeemable} points for a ₹{max_redeemable} discount on this order?",
+        "HINGLISH": "{promo_msg}{items_summary}Aapka {total_count} items ka estimate lagbhag ₹{base_estimate} + {delivery_str} (Delivery) = ₹{final_estimate} hai.\n\n🎁 Aapke paas **{available_points} Ashirwad Points** hain!\nKya aap is order par ₹{max_redeemable} ke discount ke liye {max_redeemable} points redeem karna chahenge?",
+        "GUJLISH": "{promo_msg}{items_summary}Aapna {total_count} items no andajit bill ₹{base_estimate} + {delivery_str} (Delivery) = ₹{final_estimate} che.\n\n🎁 Aapni pase **{available_points} Ashirwad Points** che!\nSu tame aa order par ₹{max_redeemable} na discount mate {max_redeemable} points redeem karva mangso?"
     },
     "POINTS_BUTTON_YES": {
         "ENGLISH": "✅ Redeem ₹{max_redeemable}",
@@ -65,9 +105,9 @@ TRANSLATIONS = {
         "GUJLISH": "✅ **Points Applied**: -₹{points_redeemed} discount!\n"
     },
     "ADDRESS_CONFIRMATION_SAVED": {
-        "ENGLISH": "👕 *Garments Estimate*: ₹{base_estimate}\n🚚 *Delivery Charge*: {delivery_str}\n{promo_msg}**Total Estimate: ₹{final_estimate}**\n\n*Policy Check*: Color, kasab, and zhumka work are handled at owner's risk.\n\n🏠 We will pick this up from your saved address:\n*{saved_address}*",
-        "HINGLISH": "👕 *Garments Estimate*: ₹{base_estimate}\n🚚 *Delivery Charge*: {delivery_str}\n{promo_msg}**Total Estimate: ₹{final_estimate}**\n\n*Policy Check*: Color, kasab, aur zhumka work customer ke risk par rahega.\n\n🏠 Hum aapke saved address se pickup karenge:\n*{saved_address}*",
-        "GUJLISH": "👕 *Garments Estimate*: ₹{base_estimate}\n🚚 *Delivery Charge*: {delivery_str}\n{promo_msg}**Total Estimate: ₹{final_estimate}**\n\n*Policy Check*: Color, kasab, ane zhumka work customer na risk par rahese.\n\n🏠 Ame aapna saved address parthi pickup karishu:\n*{saved_address}*"
+        "ENGLISH": "{items_summary}👕 *Garments Estimate*: ₹{base_estimate}\n🚚 *Delivery Charge*: {delivery_str}\n{promo_msg}**Total Estimate: ₹{final_estimate}**\n\n⚠️ *Note*: Prices may vary slightly for heavy fabrics or deep stain removal (we will verify & confirm during pickup!).\n\n*Policy Check*: Color, kasab, and zhumka work are handled at owner's risk.\n\n🏠 We will pick this up from your saved address:\n*{saved_address}*",
+        "HINGLISH": "{items_summary}👕 *Garments Estimate*: ₹{base_estimate}\n🚚 *Delivery Charge*: {delivery_str}\n{promo_msg}**Total Estimate: ₹{final_estimate}**\n\n⚠️ *Note*: Heavy fabric ya zyaada daag (stains) hone par price thoda vary ho sakta hai (hum pickup par check karke confirm kar denge!).\n\n*Policy Check*: Color, kasab, aur zhumka work customer ke risk par rahega.\n\n🏠 Hum aapke saved address se pickup karenge:\n*{saved_address}*",
+        "GUJLISH": "{items_summary}👕 *Garments Estimate*: ₹{base_estimate}\n🚚 *Delivery Charge*: {delivery_str}\n{promo_msg}**Total Estimate: ₹{final_estimate}**\n\n⚠️ *Note*: Heavy fabric ke vada daag (stains) hova par bhav thodo change thai shake che (ame pickup vakhate check kari ne confirm kari daishu!).\n\n*Policy Check*: Color, kasab, ane zhumka work customer na risk par rahese.\n\n🏠 Ame aapna saved address parthi pickup karishu:\n*{saved_address}*"
     },
     "ADDRESS_BUTTON_YES": {
         "ENGLISH": "✅ Yes, use this",
@@ -80,9 +120,9 @@ TRANSLATIONS = {
         "GUJLISH": "📝 Navu Address"
     },
     "ADDRESS_CONFIRMATION_NEW": {
-        "ENGLISH": "👕 *Garments Estimate*: ₹{base_estimate}\n🚚 *Delivery Charge*: {delivery_str}\n{promo_msg}**Total Estimate: ₹{final_estimate}**\n\n*Policy Check*: Color, kasab, and zhumka work are handled at owner's risk.\n\n📍 **Note: We currently ONLY offer pickup and delivery in the Paldi area.**\n\nTo accept this policy and confirm your order, please reply with your exact Paldi address (Flat/House Number and Building Name) or share your WhatsApp location pin.",
-        "HINGLISH": "👕 *Garments Estimate*: ₹{base_estimate}\n🚚 *Delivery Charge*: {delivery_str}\n{promo_msg}**Total Estimate: ₹{final_estimate}**\n\n*Policy Check*: Color, kasab, aur zhumka work customer ke risk par rahega.\n\n📍 **Note: Hum abhi sirf Paldi area mein pickup aur delivery dete hain.**\n\nIs policy ko accept karne aur order confirm karne ke liye, kripya apna exact Paldi address (Flat/House Number aur Building Name) reply karein ya WhatsApp location pin share karein.",
-        "GUJLISH": "👕 *Garments Estimate*: ₹{base_estimate}\n🚚 *Delivery Charge*: {delivery_str}\n{promo_msg}**Total Estimate: ₹{final_estimate}**\n\n*Policy Check*: Color, kasab, ane zhumka work customer na risk par rahese.\n\n📍 **Note: Ame atyare khali Paldi area ma j pickup ane delivery apiye chhiye.**\n\nAa policy accept karva ane order confirm karva mate, kripa kari aapno exact Paldi address (Flat/House Number ane Building Name) reply karo ke WhatsApp location pin share karo."
+        "ENGLISH": "{items_summary}👕 *Garments Estimate*: ₹{base_estimate}\n🚚 *Delivery Charge*: {delivery_str}\n{promo_msg}**Total Estimate: ₹{final_estimate}**\n\n⚠️ *Note*: Prices may vary slightly for heavy fabrics or deep stain removal (we will verify & confirm during pickup!).\n\n*Policy Check*: Color, kasab, and zhumka work are handled at owner's risk.\n\n📍 **Note: We currently ONLY offer pickup and delivery in the Paldi area.**\n\nTo accept this policy and confirm your order, please reply with your exact Paldi address (Flat/House Number and Building Name) or share your WhatsApp location pin.",
+        "HINGLISH": "{items_summary}👕 *Garments Estimate*: ₹{base_estimate}\n🚚 *Delivery Charge*: {delivery_str}\n{promo_msg}**Total Estimate: ₹{final_estimate}**\n\n⚠️ *Note*: Heavy fabric ya zyaada daag (stains) hone par price thoda vary ho sakta hai (hum pickup par check karke confirm kar denge!).\n\n*Policy Check*: Color, kasab, aur zhumka work customer ke risk par rahega.\n\n📍 **Note: Hum abhi sirf Paldi area mein pickup aur delivery dete hain.**\n\nIs policy ko accept karne aur order confirm karne ke liye, kripya apna exact Paldi address (Flat/House Number aur Building Name) reply karein ya WhatsApp location pin share karein.",
+        "GUJLISH": "{items_summary}👕 *Garments Estimate*: ₹{base_estimate}\n🚚 *Delivery Charge*: {delivery_str}\n{promo_msg}**Total Estimate: ₹{final_estimate}**\n\n⚠️ *Note*: Heavy fabric ke vada daag (stains) hova par bhav thodo change thai shake che (ame pickup vakhate check kari ne confirm kari daishu!).\n\n*Policy Check*: Color, kasab, ane zhumka work customer na risk par rahese.\n\n📍 **Note: Ame atyare khali Paldi area ma j pickup ane delivery apiye chhiye.**\n\nAa policy accept karva ane order confirm karva mate, kripa kari aapno exact Paldi address (Flat/House Number ane Building Name) reply karo ke WhatsApp location pin share karo."
     },
     "ADDRESS_INPUT_NEW_REQUEST": {
         "ENGLISH": "Please reply with your new exact address (Flat/House Number and Building Name) or share your WhatsApp location pin.",
@@ -94,10 +134,15 @@ TRANSLATIONS = {
         "HINGLISH": "Kripya buttons mein se kisi ek par tap karein.",
         "GUJLISH": "Kripa kari buttons mathi koi ek par tap karo."
     },
+    "AFTER_HOURS_NOTE": {
+        "ENGLISH": "🌙 *After-Hours Pickup Note*: Our shop operating hours are 9:00 AM – 8:30 PM. Your order has been registered, and our runner will arrive to pick up your garments tomorrow morning after 9:00 AM!\n\n",
+        "HINGLISH": "🌙 *After-Hours Pickup Note*: Aapka order register ho gaya hai! Humari shop abhi band hai (Hours: 9:00 AM – 8:30 PM), humari team kal subah 9:00 AM ke baad aapka pickup kar legi.\n\n",
+        "GUJLISH": "🌙 *After-Hours Pickup Note*: Aapno order register thai gayo che! Amari shop atyare band che (Samay: 9:00 AM – 8:30 PM), amari team kal savere 9:00 AM pachhi aapno pickup kari lese.\n\n"
+    },
     "ORDER_SUCCESS": {
-        "ENGLISH": "Thank you! Your order {order_id} has been created successfully. We will be at your location soon!",
-        "HINGLISH": "Shukriya! Aapka order {order_id} safaltapurvak ban gaya hai. Hum jald hi aapke address par honge!",
-        "GUJLISH": "Aabhar! Aapno order {order_id} safaltapurvak bani gayo che. Ame jaldi thi aapna address par pahonchishu!"
+        "ENGLISH": "🎉 *Order #{order_id} Confirmed!* 🎉\n\n{items_summary}👕 *Garments Estimate*: ₹{base_estimate}\n🚚 *Delivery Charge*: {delivery_str}\n{promo_msg}**Total Estimate: ₹{final_estimate}**\n\n🏠 *Pickup Address*:\n{saved_address}\n\n{after_hours_note}Thank you for choosing Ashirwad Cleaners!",
+        "HINGLISH": "🎉 *Order #{order_id} Confirm Ho Gaya Hai!* 🎉\n\n{items_summary}👕 *Garments Estimate*: ₹{base_estimate}\n🚚 *Delivery Charge*: {delivery_str}\n{promo_msg}**Total Estimate: ₹{final_estimate}**\n\n🏠 *Pickup Address*:\n{saved_address}\n\n{after_hours_note}Ashirwad Cleaners ko chunne ke liye shukriya!",
+        "GUJLISH": "🎉 *Order #{order_id} Confirm Thai Gayo Che!* 🎉\n\n{items_summary}👕 *Garments Estimate*: ₹{base_estimate}\n🚚 *Delivery Charge*: {delivery_str}\n{promo_msg}**Total Estimate: ₹{final_estimate}**\n\n🏠 *Pickup Address*:\n{saved_address}\n\n{after_hours_note}Ashirwad Cleaners ne pasand karva mate aabhar!"
     },
     "STATUS_NO_ORDERS": {
         "ENGLISH": "You don't have any active orders right now. Would you like to schedule a pickup? Just say 'Pickup'!",

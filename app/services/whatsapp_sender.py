@@ -61,3 +61,28 @@ def send_interactive_buttons(to_number: str, body_text: str, buttons: list):
     }
     response = requests.post(url, headers=headers, json=payload)
     return response.json()
+
+def send_image_message(to_number: str, image_url: str, caption: str = None):
+    if not WA_ACCESS_TOKEN:
+        print(f"MOCK WA SEND [IMAGE] to {to_number}: {image_url} | Caption: {caption}")
+        return {"status": "mocked"}
+        
+    url = f"https://graph.facebook.com/{GRAPH_API_VERSION}/{WA_PHONE_NUMBER_ID}/messages"
+    headers = {
+        "Authorization": f"Bearer {WA_ACCESS_TOKEN}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "messaging_product": "whatsapp",
+        "recipient_type": "individual",
+        "to": to_number,
+        "type": "image",
+        "image": {
+            "link": image_url
+        }
+    }
+    if caption:
+        payload["image"]["caption"] = caption
+        
+    response = requests.post(url, headers=headers, json=payload)
+    return response.json()
