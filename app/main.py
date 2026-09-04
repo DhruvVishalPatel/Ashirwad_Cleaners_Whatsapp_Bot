@@ -15,6 +15,9 @@ from app.services.whatsapp_sender import send_text_message
 from app.core.graph import compiled_graph
 from app.core.logger import logger
 
+from fastapi.middleware.cors import CORSMiddleware
+from app.api.router import api_router
+
 load_dotenv()
 
 @asynccontextmanager
@@ -25,7 +28,24 @@ async def lifespan(app: FastAPI):
     yield
 
 app = FastAPI(title="Ashirwad Cleaners Agent API", lifespan=lifespan)
+
+# Configure CORS for local development and production admin access
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(api_router)
+
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# Mount built frontend if dist directory exists
+if os.path.exists("frontend/dist"):
+    app.mount("/admin", StaticFiles(directory="frontend/dist", html=True), name="frontend")
+
 
 VERIFY_TOKEN = os.environ.get("VERIFY_TOKEN", "YOUR_CUSTOM_VERIFY_TOKEN")
 

@@ -72,3 +72,8 @@ venv.bak/
 # Log files
 logs/
 *.log
+
+# Node.js frontend
+frontend/node_modules/
+frontend/dist/
+

@@ -165,6 +165,18 @@ def create_order(db: Session, customer_id: int, item_count: int, order_type: str
             if points_redeemed > 0:
                 add_points_transaction(db, customer_id, points_redeemed, "REDEEMED", db_order.order_id)
                 
+            # Broadcast real-time WebSocket event to admin dashboard
+            try:
+                from app.core.ws_manager import broadcast_event_sync
+                broadcast_event_sync("ORDER_CREATED", {
+                    "order_id": db_order.order_id,
+                    "customer_id": customer_id,
+                    "item_count": item_count,
+                    "service_category": service_category
+                })
+            except Exception:
+                pass
+
             return db_order
         except IntegrityError:
             db.rollback()
