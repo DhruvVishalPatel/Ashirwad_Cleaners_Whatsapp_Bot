@@ -42,13 +42,6 @@ app.include_router(api_router)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Mount built frontend if dist directory exists
-if os.path.exists("frontend/dist"):
-    app.mount("/admin", StaticFiles(directory="frontend/dist", html=True), name="frontend_admin")
-    app.mount("/", StaticFiles(directory="frontend/dist", html=True), name="frontend_root")
-
-
-
 VERIFY_TOKEN = os.environ.get("VERIFY_TOKEN", "YOUR_CUSTOM_VERIFY_TOKEN")
 
 def process_whatsapp_message(payload: dict):
@@ -156,4 +149,10 @@ async def receive_webhook(request: Request, background_tasks: BackgroundTasks):
     except Exception as e:
         logger.error(f"Webhook Endpoint Error: {e}")
         raise HTTPException(status_code=400, detail="Invalid payload")
+
+# Mount built frontend at bottom so explicit API & Webhook routes take precedence
+if os.path.exists("frontend/dist"):
+    app.mount("/admin", StaticFiles(directory="frontend/dist", html=True), name="frontend_admin")
+    app.mount("/", StaticFiles(directory="frontend/dist", html=True), name="frontend_root")
+
 
