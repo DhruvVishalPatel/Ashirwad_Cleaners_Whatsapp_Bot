@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Search, Save, MapPin } from 'lucide-react';
-import { api } from '../api';
+import { api, getGoogleMapsUrl } from '../api';
+
 
 export default function CustomerDirectory({ customers, onRefresh }) {
   const [searchTerm, setSearchTerm] = useState('');
@@ -136,7 +137,7 @@ export default function CustomerDirectory({ customers, onRefresh }) {
                         />
                         {gpsVal && (
                           <a
-                            href={`https://www.google.com/maps?q=${gpsVal}`}
+                            href={getGoogleMapsUrl(gpsVal)}
                             target="_blank"
                             rel="noreferrer"
                             title="Open in Maps"
