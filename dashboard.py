@@ -476,10 +476,9 @@ with SessionLocal() as db:
                         customer_name = order.customer.name if order.customer and order.customer.name else "Unknown"
                         location = order.customer.last_location_gps if order.customer and order.customer.last_location_gps else "No Location Provided"
                         
-                        if location != "No Location Provided":
-                            maps_link = f"https://www.google.com/maps?q={location}"
-                        else:
-                            maps_link = "No link available."
+                        from app.services.crud import get_google_maps_url
+                        maps_link = get_google_maps_url(location) or "No link available."
+
                             
                         action = 'PICKUP' if order.status.name == 'PENDING_PICKUP' else 'DELIVERY'
                         

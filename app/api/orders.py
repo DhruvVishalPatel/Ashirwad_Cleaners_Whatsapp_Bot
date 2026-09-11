@@ -292,8 +292,11 @@ def dispatch_runner(order_id: str, req: DispatchRunnerRequest, db: Session = Dep
 
     customer_phone = order.customer.phone_number if order.customer else "N/A"
     customer_name = order.customer.name if order.customer and order.customer.name else "Unknown"
-    location = order.customer.last_location_gps if order.customer and order.customer.last_location_gps else "No Location Provided"
-    maps_link = f"https://www.google.com/maps?q={location}" if location != "No Location Provided" else "No link available."
+    from app.services.crud import get_google_maps_url
+    maps_link = get_google_maps_url(location) if location != "No Location Provided" else "No link available."
+    if not maps_link:
+        maps_link = "No link available."
+
     action = 'PICKUP' if order.status.name == 'PENDING_PICKUP' else 'DELIVERY'
 
     delivery_fee = getattr(order, "delivery_fee", 0.0) or 0.0

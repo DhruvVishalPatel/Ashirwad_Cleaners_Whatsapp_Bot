@@ -31,6 +31,15 @@ def update_customer_location(db: Session, customer_id: int, lat_long: str):
         customer.last_location_gps = lat_long
         db.commit()
 
+def get_google_maps_url(location: Optional[str]) -> str:
+    if not location or location in ["N/A", "No Location Provided"]:
+        return ""
+    loc = location.strip()
+    if loc.startswith("http://") or loc.startswith("https://"):
+        return loc
+    return f"https://www.google.com/maps?q={loc}"
+
+
 def update_customer_saved_address(db: Session, customer_id: int, address: str):
     customer = db.query(Customer).filter(Customer.customer_id == customer_id).first()
     if customer:

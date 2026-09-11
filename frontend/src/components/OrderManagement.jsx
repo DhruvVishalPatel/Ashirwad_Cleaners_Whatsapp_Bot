@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Edit3, X, Plus, Trash2, MapPin, Send, AlertTriangle, Lock, CheckCircle2 } from 'lucide-react';
-import { api } from '../api';
+import { api, getGoogleMapsUrl } from '../api';
+
 
 const STATUS_HUMAN_MAP = {
   PENDING_PICKUP: 'Pending Pickup',
@@ -317,7 +318,7 @@ export default function OrderManagement({ orders, runners, catalog, onRefresh })
                     </div>
                     {o.last_location_gps && (
                       <a
-                        href={`https://www.google.com/maps?q=${o.last_location_gps}`}
+                        href={getGoogleMapsUrl(o.last_location_gps)}
                         target="_blank"
                         rel="noreferrer"
                         style={{ fontSize: '0.75rem', color: 'var(--accent-info)', display: 'inline-flex', alignItems: 'center', gap: '2px' }}

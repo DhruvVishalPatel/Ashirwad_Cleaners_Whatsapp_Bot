@@ -12,6 +12,16 @@ export function setAuthToken(token) {
   }
 }
 
+export function getGoogleMapsUrl(location) {
+  if (!location || location === 'N/A' || location === 'No Location Provided') return '';
+  const loc = location.trim();
+  if (loc.startsWith('http://') || loc.startsWith('https://')) {
+    return loc;
+  }
+  return `https://www.google.com/maps?q=${encodeURIComponent(loc)}`;
+}
+
+
 async function request(endpoint, options = {}) {
   const token = getAuthToken();
   const headers = {
