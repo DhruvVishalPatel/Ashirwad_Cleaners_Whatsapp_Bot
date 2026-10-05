@@ -253,6 +253,61 @@ TRANSLATIONS = {
         "ENGLISH": "🙏 Thank you for contacting Ashirwad Cleaners! Your order has been cancelled. Feel free to message us whenever you need our services. Have a wonderful day!",
         "HINGLISH": "🙏 Ashirwad Cleaners se judne ke liye shukriya! Aapka order cancel kar diya gaya hai. Jab bhi aapko service ki zaroorat ho, humein zaroor message karein. Aapka din shubh ho!",
         "GUJLISH": "🙏 Ashirwad Cleaners no sampark karva badal aabhar! Aapno order cancel kari didho che. Jyare pan tamne service ni jarur hoy, amne zaroor message karjo. Aapno divas subh rahe!"
+    },
+    "CANCEL_NO_ACTIVE_ORDERS": {
+        "ENGLISH": "You do not have any active orders right now. Would you like to schedule a pickup?",
+        "HINGLISH": "Aapka abhi koi active order nahi hai. Kya aap pickup schedule karna chahte hain?",
+        "GUJLISH": "Aapno atyare koi active order nathi. Su tame pickup schedule karva mangso?"
+    },
+    "CANCEL_NO_PENDING_PICKUP": {
+        "ENGLISH": "⚠️ You don't have any orders pending pickup. Orders already received at the shop cannot be cancelled via chat. Please contact our shop directly if you need assistance.",
+        "HINGLISH": "⚠️ Aapka koi order pending pickup mein nahi hai. Shop par receive ho chuke orders chat se cancel nahi ho sakte. Kripya shop par contact karein.",
+        "GUJLISH": "⚠️ Aapno koi order pending pickup ma nathi. Shop par mali gayela orders chat thi cancel nathi thai sakta. Kripa kari shop par contact karo."
+    },
+    "CANCEL_NOT_PENDING_PICKUP": {
+        "ENGLISH": "⚠️ Order #{order_id} cannot be cancelled because it is already {status_str} at our shop. Please contact our shop directly if you need urgent assistance.",
+        "HINGLISH": "⚠️ Order #{order_id} cancel nahi ho sakta kyunki yeh shop par {status_str} hai. Kripya shop par contact karein.",
+        "GUJLISH": "⚠️ Order #{order_id} cancel nathi thai shakto kem ke te shop par {status_str} che. Kripa kari shop par contact karo."
+    },
+    "CANCEL_ORDER_ALREADY_CANCELLED": {
+        "ENGLISH": "ℹ️ Order #{order_id} is already cancelled.",
+        "HINGLISH": "ℹ️ Order #{order_id} pehle se hi cancelled hai.",
+        "GUJLISH": "ℹ️ Order #{order_id} pehle thi j cancelled che."
+    },
+    "CANCEL_ORDER_NOT_FOUND": {
+        "ENGLISH": "❌ We couldn't find an order with ID #{order_id} under your account. Please check the order number.",
+        "HINGLISH": "❌ Aapke account par Order #{order_id} nahi mila. Kripya order number check karein.",
+        "GUJLISH": "❌ Aapna account par Order #{order_id} nathi malyo. Kripa kari order number check karo."
+    },
+    "CANCEL_CONFIRM_PROMPT": {
+        "ENGLISH": "⚠️ Are you sure you want to cancel Order #{order_id} ({item_count} items - {service_category})?\n\nPlease confirm below:",
+        "HINGLISH": "⚠️ Kya aap Order #{order_id} ({item_count} items - {service_category}) sach mein cancel karna chahte hain?\n\nKripya confirm karein:",
+        "GUJLISH": "⚠️ Su tame Order #{order_id} ({item_count} items - {service_category}) kharekhar cancel karva mangso?\n\nKripa kari confirm karo:"
+    },
+    "BTN_CONFIRM_CANCEL": {
+        "ENGLISH": "Cancel #{order_id}",
+        "HINGLISH": "Cancel #{order_id}",
+        "GUJLISH": "Cancel #{order_id}"
+    },
+    "BTN_KEEP_ORDER": {
+        "ENGLISH": "Keep Order",
+        "HINGLISH": "Keep Order",
+        "GUJLISH": "Keep Order"
+    },
+    "CANCEL_SUCCESS": {
+        "ENGLISH": "✅ *Order #{order_id} has been successfully cancelled.*\n\nThank you for letting us know! Feel free to message us whenever you want to place a new order. Have a great day!",
+        "HINGLISH": "✅ *Order #{order_id} successfully cancel ho gaya hai.*\n\nBatane ke liye shukriya! Jab bhi naya order dena ho, humein zaroor message karein. Aapka din shubh ho!",
+        "GUJLISH": "✅ *Order #{order_id} safaltapurvak cancel thai gayo che.*\n\nJanavva badal aabhar! Jyare pan navo order aapvo hoy, amne zaroor message karjo. Aapno divas subh rahe!"
+    },
+    "CANCEL_ABORTED": {
+        "ENGLISH": "👍 Order #{order_id} remains active and we will proceed with your pickup.",
+        "HINGLISH": "👍 Order #{order_id} active hai aur hum pickup ke sath aage badhenge.",
+        "GUJLISH": "👍 Order #{order_id} active che ane ame pickup sathe aagal vadhisun."
+    },
+    "CANCEL_MULTIPLE_CHOICE": {
+        "ENGLISH": "You have multiple orders pending pickup:\n\n{orders_list}\nWhich order would you like to cancel? Please reply with 'Cancel <Order ID>' (e.g., 'Cancel {sample_id}').",
+        "HINGLISH": "Aapke multiple orders pickup ke liye pending hain:\n\n{orders_list}\nAap kaunsa order cancel karna chahte hain? Kripya 'Cancel <Order ID>' likhein (jaise, 'Cancel {sample_id}').",
+        "GUJLISH": "Aapna ek karta vadhu orders pending pickup ma che:\n\n{orders_list}\nAap kayo order cancel karva mangso? Kripa kari 'Cancel <Order ID>' lakho (jem ke, 'Cancel {sample_id}')."
     }
 }
 

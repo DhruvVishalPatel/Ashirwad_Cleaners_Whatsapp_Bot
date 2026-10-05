@@ -1,7 +1,7 @@
 from typing import Dict, Any
 from app.services.whatsapp_sender import send_text_message, send_interactive_buttons
 from app.core.translations import t
-from app.core.llm_router import generate_estimate
+from app.core.llm_router import answer_general_query, generate_estimate
 
 def greeting_node(state: dict) -> Dict[str, Any]:
     """
@@ -45,8 +45,13 @@ def qa_node(state: dict) -> Dict[str, Any]:
     lang = state["language"]
     text = state["text_input"]
     
-    estimate_data = generate_estimate(text, lang)
-    reply = estimate_data.get("reply", "I'm not sure how to answer that.")
+    reply = answer_general_query(text, lang)
+    if not reply:
+        estimate_data = generate_estimate(text, lang)
+        reply = estimate_data.get("reply", "")
+        
+    if not reply:
+        reply = "I'm not sure how to answer that. Please feel free to visit our store in Paldi or ask another question."
     
     send_text_message(state["phone_number"], reply)
     

@@ -16,7 +16,8 @@ def classify_intent(user_text: str) -> tuple[str, str]:
     
     Map the input to EXACTLY ONE of the following intents:
     - INTENT_PICKUP: The user wants to schedule a pickup or drop off clothes.
-    - INTENT_STATUS: The user is asking about the status of an existing order.
+    - INTENT_STATUS: The user is asking about the status of an existing order or tracking clothes.
+    - INTENT_CANCEL_ORDER: The user wants to cancel an existing order (e.g. "cancel my order", "i want to cancel", "cancel order", "order cancel karna hai", "order radd karvo che", "cancel 1029").
     - INTENT_PRICING: The user is asking about prices, rates, or cost of services.
     - INTENT_GREETING: General greetings, hellos, start-of-conversation indicators (e.g. "hi", "hello", "hey", "kem cho", "namaste").
     - INTENT_QA: The user is asking questions about delivery times, business rules, service locations, specific items, or seeking help/complaining (e.g. "how much time for delivery", "carpet wash hota hai").
@@ -45,7 +46,7 @@ def classify_intent(user_text: str) -> tuple[str, str]:
                 "properties": {
                     "intent": {
                         "type": "string",
-                        "enum": ["INTENT_PICKUP", "INTENT_STATUS", "INTENT_PRICING", "INTENT_GREETING", "INTENT_QA", "INTENT_CHANGE_LANGUAGE"]
+                        "enum": ["INTENT_PICKUP", "INTENT_STATUS", "INTENT_CANCEL_ORDER", "INTENT_PRICING", "INTENT_GREETING", "INTENT_QA", "INTENT_CHANGE_LANGUAGE"]
                     },
                     "detected_language": {
                         "type": "string",
@@ -66,6 +67,78 @@ def classify_intent(user_text: str) -> tuple[str, str]:
     except Exception as e:
         logger.error(f"Error classifying intent for input '{user_text}': {e}")
         return "INTENT_QA", "ENGLISH"
+
+
+def answer_general_query(user_text: str, language: str = "ENGLISH") -> str:
+    """Answers general customer questions (store hours, address, services, cancellation, turnaround, etc.)
+    using verified store facts, strictly respecting the customer's preferred language.
+    """
+    lang = (language or "ENGLISH").upper()
+    if lang == "HINGLISH":
+        lang_instruction = (
+            "CRITICAL LANGUAGE RULE: The customer's preferred language is HINGLISH. "
+            "Formulate your entire response strictly in conversational Hindi written in the Latin (English) alphabet "
+            '(e.g., "Humari shop Paldi mein hai..."). Do NOT respond in pure English or Gujarati.'
+        )
+    elif lang == "GUJLISH":
+        lang_instruction = (
+            "CRITICAL LANGUAGE RULE: The customer's preferred language is GUJLISH. "
+            "Formulate your entire response strictly in conversational Gujarati written in the Latin (English) alphabet "
+            '(e.g., "Amari shop Paldi ma che..."). Do NOT respond in pure English or Hindi.'
+        )
+    else:
+        lang_instruction = (
+            "CRITICAL LANGUAGE RULE: The customer's preferred language is ENGLISH. "
+            "You MUST formulate your entire response STRICTLY in 100% standard, professional ENGLISH only. "
+            "Under NO circumstances should you use any Hindi, Hinglish, or Gujarati words."
+        )
+
+    prompt = f"""
+    You are an AI customer support assistant for Ashirwad Cleaners, a premium dry-cleaning and laundry service in Ahmedabad.
+    
+    Verified Store Facts:
+    - Business Name: Ashirwad Cleaners
+    - Shop Address: Raj Nagar complex, Rajnagar Society, Paldi, Ahmedabad, Gujarat 380007
+    - Google Maps: https://maps.app.goo.gl/WFEzKEH5bHYWm6DRA
+    - Service Area: Paldi area only for home pickup and delivery. Customers from other areas are welcome to drop off garments directly at the store.
+    - Operating Hours: 9:00 AM to 8:30 PM (Open 7 days a week).
+    - Services Offered: Premium Dry Cleaning, Washing, Steam Pressing, Petrol Wash, Stain Removal.
+    - Turnaround Time: Typically 2 to 3 days.
+    - Delivery Fee: ₹30 standard delivery fee (Waived for 4+ orders placed in a calendar month).
+    - Loyalty Program: Earn 2 points per garment upon payment; redeemable at ₹1 per point once customer reaches 50+ points.
+    - Order Cancellation: Customers can cancel orders while in 'Pending Pickup' status directly through WhatsApp. Orders already picked up or in-shop cannot be cancelled via chat.
+    
+    Customer Question: "{user_text}"
+    
+    {lang_instruction}
+    
+    Instructions:
+    - Provide a polite, helpful, and concise response addressing the user's question using the verified store facts.
+    - Do not invent services or locations not listed above.
+    - Keep response under 3 sentences where possible.
+    
+    Respond in JSON format with key 'reply'.
+    """
+
+    model_name = os.environ.get("GEMINI_MODEL", "gemini-3.6-flash")
+    try:
+        response = client.models.generate_content(
+            model=model_name,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                response_schema={
+                    "type": "object",
+                    "properties": {"reply": {"type": "string"}},
+                    "required": ["reply"]
+                }
+            )
+        )
+        data = json.loads(response.text)
+        return data.get("reply", "")
+    except Exception as e:
+        logger.error(f"Error answering general query '{user_text}': {e}")
+        return ""
 
 
 def generate_estimate(user_text: str, language: str = "ENGLISH") -> dict:
@@ -90,6 +163,32 @@ def generate_estimate(user_text: str, language: str = "ENGLISH") -> dict:
         logger.error(f"Error querying catalog_items in generate_estimate: {e}")
         return {"is_question": False, "reply": "", "total_items_count": 0, "base_estimate": 0.0, "identified_services": ["Dry Clean"], "garments": []}
 
+    lang = (language or "ENGLISH").upper()
+    if lang == "HINGLISH":
+        lang_rule = (
+            "CRITICAL LANGUAGE RULE: The customer's preferred language is HINGLISH. "
+            "Write the 'conversational_reply' strictly in conversational Hindi using Latin (English) script "
+            '(e.g., "Aapka dry clean ka cost..."). Do NOT respond in pure English or Gujarati.'
+        )
+        unserviceable_ex = 'Sorry, Jackets ke liye Petrol Wash uplabdh nahi hai. Par Dry Cleaning ₹200 mein available hai. Kya aap dry clean karwana chahenge?'
+        vague_ex = 'Kripya apne kapde aur unki service list karein, jaise: 2 shirts for washing, 1 saree for dry clean'
+    elif lang == "GUJLISH":
+        lang_rule = (
+            "CRITICAL LANGUAGE RULE: The customer's preferred language is GUJLISH. "
+            "Write the 'conversational_reply' strictly in conversational Gujarati using Latin (English) script "
+            '(e.g., "Aapna dry clean no bhav..."). Do NOT respond in pure English or Hindi.'
+        )
+        unserviceable_ex = 'Maf karsho, Jacket mate Petrol Wash uplabdh nathi. Pan Jacket mate Dry Cleaning ₹200 ma uplabdh che. Shu tame dry clean karavva mango cho?'
+        vague_ex = 'Kripya tamara kapda ane service list karo, jem ke: 2 shirts for washing, 1 saree for dry clean'
+    else:
+        lang_rule = (
+            "CRITICAL LANGUAGE RULE: The customer's preferred language is ENGLISH. "
+            "You MUST formulate 'conversational_reply' STRICTLY in 100% standard, professional ENGLISH only. "
+            "Under NO circumstances should you use any Hindi, Hinglish, or Gujarati words."
+        )
+        unserviceable_ex = 'Sorry, we do not offer Petrol Wash for Jackets. However, we do offer Dry Cleaning for Jackets at ₹200. Would you like to dry clean your jacket instead?'
+        vague_ex = 'Please list your garments and their desired service, e.g.: 2 shirts for washing, 1 saree for dry clean'
+
     prompt = f"""
     You are an AI assistant for Ashirwad Cleaners.
     The customer wants to schedule a pickup for their clothes. They may request multiple different services.
@@ -101,12 +200,12 @@ def generate_estimate(user_text: str, language: str = "ENGLISH") -> dict:
     
     Instructions:
     1. If the user is asking a question (e.g., about pricing, services, or general chat), OR if their input is vague/incomplete as described in step 6, set 'is_question_or_conversational' to true and provide a helpful 'conversational_reply' based on the price list provided.
-       CRITICAL: Write the 'conversational_reply' in {language} transliterated into the Latin (English) script. For example, if {language} is HINGLISH, write in Hindi using English letters (e.g., "Aapka dry clean ka cost..."). If {language} is GUJLISH, write in Gujarati using English letters (e.g., "Aapna dry clean no bhav...").
+       {lang_rule}
     2. If they are listing garments for pickup (e.g., "3 shirts for dry clean", "1 pant"), extract all garments into the 'garments' array. If quantity is not specified (e.g., "jacket", "saree"), DEFAULT quantity to 1!
     3. Determine which service category they want for each garment based on their input (e.g., 'washing', 'dry_clean', 'steam_press', 'petrol_wash'). If they don't explicitly specify, default to 'dry_clean'.
     4. Normalize each garment strictly to one of the valid item names in the chosen category. Handle synonyms (e.g., 'jeans' -> 'Pant', 'jacket' -> 'Jacket').
-    5. UNSERVICEABLE ITEMS / CATEGORIES: If a user requests a service for an item that is NOT offered in that service category (e.g., requesting "jacket petrol wash" when Jacket is only available under dry_clean), set 'is_question_or_conversational' to true, keep 'garments' empty, and write a clear, polite 'conversational_reply' in {language} (using Latin script) explaining that we do not offer that specific service for that item, but mention the service and price where the item IS available (e.g., "Sorry, we do not offer Petrol Wash for Jackets. However, we do offer Dry Cleaning for Jackets at ₹200. Would you like to dry clean your jacket instead?").
-    6. If the user is trying to request a pickup but their request is too vague (e.g., they just say "laundry", "laundry karvana hai", "laundry dhoni hai", "laundry no order apo" without naming any garments at all), set 'is_question_or_conversational' to true, keep 'garments' empty, and write a polite 'conversational_reply' in {language} (using Latin script) asking them to specify the clothes and services (e.g. "Kripya apne kapde aur unki service list karein, jaise: 2 shirts for washing, 1 saree for dry clean").
+    5. UNSERVICEABLE ITEMS / CATEGORIES: If a user requests a service for an item that is NOT offered in that service category (e.g., requesting "jacket petrol wash" when Jacket is only available under dry_clean), set 'is_question_or_conversational' to true, keep 'garments' empty, and write a clear, polite 'conversational_reply' explaining that we do not offer that specific service for that item, but mention the service and price where the item IS available (e.g., "{unserviceable_ex}").
+    6. If the user is trying to request a pickup but their request is too vague (e.g., they just say "laundry", "laundry karvana hai", "laundry dhoni hai", "laundry no order apo" without naming any garments at all), set 'is_question_or_conversational' to true, keep 'garments' empty, and write a polite 'conversational_reply' asking them to specify the clothes and services (e.g. "{vague_ex}").
     7. CRITICAL FOR ADDITIONS / REMOVALS / MODIFICATIONS: If the customer is adding, removing, or updating garments (e.g., "remove 4 pants from wash", "add 2 shirts", "nikal do 1 saree", "remove 1 shirt", "add 3 pants"), you MUST extract those garments and their quantities into the 'garments' array! Do NOT set 'is_question_or_conversational' to true for garment additions or removals.
     
     Output ONLY valid JSON matching the schema. Do not do any math.

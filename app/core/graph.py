@@ -20,6 +20,7 @@ from app.flows.pickup import (
 )
 from app.flows.pricing import pricing_node
 from app.flows.status import status_node
+from app.flows.cancel import cancel_node
 from app.flows.qa import greeting_node, change_language_node, qa_node
 
 # ----------------- STATE SCHEMA -----------------
@@ -28,7 +29,7 @@ class BotState(TypedDict):
     phone_number: str
     customer_id: int
     language: str              # "ENGLISH", "HINGLISH", "GUJLISH"
-    current_flow: str          # "IDLE", "PICKUP", "PRICING", "STATUS", "QA"
+    current_flow: str          # "IDLE", "PICKUP", "PRICING", "STATUS", "QA", "CANCEL"
     current_state: str         # Sub-state in flows
     last_active_state: str     # Backtracking / Resume location
     
@@ -48,6 +49,7 @@ class BotState(TypedDict):
     final_estimate: float
     pending_items_input: str
     direct_order_prefix: str
+    cancel_order_id: str
 
 # ----------------- GRAPH NODES -----------------
 
@@ -55,6 +57,7 @@ def classifier_node(state: BotState) -> Dict[str, Any]:
     """
     Decides intent, language, and potential backtracking requests.
     """
+    import re
     text = state.get("text_input", "").strip()
     clean_text = text.lower()
     
@@ -87,9 +90,28 @@ def classifier_node(state: BotState) -> Dict[str, Any]:
             "response_sent": False
         }
 
+    # 1.1 Direct Order Cancellation Actions (Buttons or explicit cancel orders)
+    if text.startswith("btn_confirm_cancel") or text == "btn_keep_order":
+        return {
+            "current_flow": "CANCEL",
+            "response_sent": False
+        }
+
+    is_direct_order_cancel = (
+        bool(re.search(r'\bcancel\s*(?:order\s*)?(?:#\s*)?\d+\b', clean_text)) or
+        bool(re.search(r'\border\s*(?:#\s*)?\d+\s*cancel\b', clean_text)) or
+        clean_text in ["cancel order", "cancel my order", "i want to cancel my order", "i want to cancel", "order cancel", "order cancel karna", "order radd", "order cancel karna hai", "order cancel karvu che", "order radd karvo che"]
+    )
+    if is_direct_order_cancel:
+        return {
+            "current_flow": "CANCEL",
+            "current_state": "",
+            "response_sent": False
+        }
+
     # 2. Global Reset Keywords
     reset_keywords = ["cancel", "restart", "start over", "reset", "radd", "cancel karo", "shuru se", "radd karo", "chodi do", "fari shuru karo"]
-    if clean_text in reset_keywords:
+    if clean_text in reset_keywords and state.get("current_flow") != "CANCEL":
         send_text_message(state["phone_number"], t("SESSION_CANCELLED", state.get("language", "ENGLISH")))
         return {
             "current_flow": "IDLE",
@@ -110,6 +132,9 @@ def classifier_node(state: BotState) -> Dict[str, Any]:
         
     # 4. Active flow check
     if state.get("current_flow") != "IDLE":
+        if state.get("current_flow") == "CANCEL":
+            return {"response_sent": False}
+
         if text.startswith("btn_"):
             return {"response_sent": False}
             
@@ -224,6 +249,7 @@ def classifier_node(state: BotState) -> Dict[str, Any]:
     flow_mapping = {
         "INTENT_PICKUP": "PICKUP",
         "INTENT_STATUS": "STATUS",
+        "INTENT_CANCEL_ORDER": "CANCEL",
         "INTENT_PRICING": "PRICING",
         "INTENT_GREETING": "GREETING",
         "INTENT_QA": "QA",
@@ -250,6 +276,8 @@ def route_next_node(state: BotState) -> str:
         return "greeting"
     elif flow == "STATUS":
         return "status"
+    elif flow == "CANCEL":
+        return "cancel"
     elif flow == "PRICING":
         return "pricing"
     elif flow == "QA":
@@ -291,6 +319,7 @@ builder.add_node("pickup_points", pickup_points_node)
 builder.add_node("pickup_address", pickup_address_node)
 builder.add_node("pricing", pricing_node)
 builder.add_node("status", status_node)
+builder.add_node("cancel", cancel_node)
 builder.add_node("qa", qa_node)
 builder.add_node("change_language", change_language_node)
 
@@ -303,6 +332,7 @@ builder.add_conditional_edges(
     {
         "greeting": "greeting",
         "status": "status",
+        "cancel": "cancel",
         "pricing": "pricing",
         "qa": "qa",
         "change_language": "change_language",
@@ -314,7 +344,7 @@ builder.add_conditional_edges(
     }
 )
 
-nodes_to_route = ["greeting", "pickup_name", "pickup_items", "pickup_points", "pickup_address", "pricing", "status", "qa", "change_language"]
+nodes_to_route = ["greeting", "pickup_name", "pickup_items", "pickup_points", "pickup_address", "pricing", "status", "cancel", "qa", "change_language"]
 for node in nodes_to_route:
     builder.add_conditional_edges(
         node,
@@ -322,6 +352,7 @@ for node in nodes_to_route:
         {
             "greeting": "greeting",
             "status": "status",
+            "cancel": "cancel",
             "pricing": "pricing",
             "qa": "qa",
             "change_language": "change_language",
