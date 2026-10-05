@@ -213,6 +213,46 @@ TRANSLATIONS = {
         "ENGLISH": "📍 It looks like your address is not in Paldi. We currently only offer service in the Paldi area. Please reply with your exact Paldi address or location pin.",
         "HINGLISH": "📍 Lagta hai aapka address Paldi mein nahi hai. Hum abhi sirf Paldi area mein service dete hain. Kripya apna sahi Paldi ka address ya location pin bhejein.",
         "GUJLISH": "📍 Lage che aapnu address Paldi ma nathi. Ame hamna khali Paldi area ma j service aapiye chhiye. Kripa kari aapnu sahi Paldi nu address ke location pin moklo."
+    },
+    "OUTSIDE_PALDI_OPTIONS": {
+        "ENGLISH": "📍 It looks like your address is outside our pickup & delivery service area in Paldi.\n\nHow would you like to proceed?",
+        "HINGLISH": "📍 Lagta hai aapka address Paldi pickup service area se bahar hai.\n\nAap aage kya karna chahenge?",
+        "GUJLISH": "📍 Lage che aapnu address Paldi pickup service area ni bahar che.\n\nAap aagal su karva mangso?"
+    },
+    "BTN_OUTSIDE_STORE_DROP": {
+        "ENGLISH": "Drop at Store",
+        "HINGLISH": "Shop Par Drop",
+        "GUJLISH": "Shop Par Aapo"
+    },
+    "BTN_OUTSIDE_PALDI_ADDR": {
+        "ENGLISH": "Paldi Address",
+        "HINGLISH": "Paldi Address",
+        "GUJLISH": "Paldi Address"
+    },
+    "BTN_OUTSIDE_CANCEL": {
+        "ENGLISH": "Cancel Order",
+        "HINGLISH": "Cancel Karein",
+        "GUJLISH": "Cancel Karo"
+    },
+    "ASK_NEW_PALDI_ADDRESS": {
+        "ENGLISH": "📍 Please reply with your address located in Paldi or share your location pin:",
+        "HINGLISH": "📍 Kripya apna Paldi ka address likhein ya location pin share karein:",
+        "GUJLISH": "📍 Kripa kari aapnu Paldi nu address lakho ke location pin share karo:"
+    },
+    "AFTER_HOURS_STORE_NOTE": {
+        "ENGLISH": "🌙 *Note*: Our store is currently closed. We are open from 9:00 AM to 8:30 PM tomorrow. Please visit us then!\n\n",
+        "HINGLISH": "🌙 *Note*: Shop abhi band hai. Hum kal subah 9:00 AM se shaam 8:30 PM tak khule rahenge. Kripya shop hours mein kapde drop kar dein!\n\n",
+        "GUJLISH": "🌙 *Note*: Shop atyare band che. Ame kal savere 9:00 AM thi sanje 8:30 PM sudhi khulla chhiye. Kripa kari shop na samay ma kapda aapi jasho!\n\n"
+    },
+    "ORDER_SUCCESS_STORE_DROP": {
+        "ENGLISH": "🎉 *Order #{order_id} Confirmed (Store Drop-off)!* 🎉\n\n{items_summary}👕 *Garments Estimate*: ₹{base_estimate}\n🚚 *Delivery Charge*: ₹0 (Self Drop-off)\n{promo_msg}**Total Estimate: ₹{final_estimate}**\n\n🏬 *Store Address*:\nRaj Nagar complex, Rajnagar Society, Paldi, Ahmedabad, Gujarat 380007\n🗺️ *Location*: https://maps.app.goo.gl/WFEzKEH5bHYWm6DRA\n⏰ *Operating Hours*: 9:00 AM – 8:30 PM\n\n{after_hours_note}Please drop off your garments at our shop during working hours. Thank you for choosing Ashirwad Cleaners!",
+        "HINGLISH": "🎉 *Order #{order_id} Confirm Ho Gaya Hai (Store Drop-off)!* 🎉\n\n{items_summary}👕 *Garments Estimate*: ₹{base_estimate}\n🚚 *Delivery Charge*: ₹0 (Self Drop-off)\n{promo_msg}**Total Estimate: ₹{final_estimate}**\n\n🏬 *Shop Ka Address*:\nRaj Nagar complex, Rajnagar Society, Paldi, Ahmedabad, Gujarat 380007\n🗺️ *Location*: https://maps.app.goo.gl/WFEzKEH5bHYWm6DRA\n⏰ *Dukaan Ka Samay*: 9:00 AM – 8:30 PM\n\n{after_hours_note}Kripya shop ke timings ke dauran apne kapde drop kar dein. Ashirwad Cleaners ko chunne ke liye shukriya!",
+        "GUJLISH": "🎉 *Order #{order_id} Confirm Thai Gayo Che (Store Drop-off)!* 🎉\n\n{items_summary}👕 *Garments Estimate*: ₹{base_estimate}\n🚚 *Delivery Charge*: ₹0 (Self Drop-off)\n{promo_msg}**Total Estimate: ₹{final_estimate}**\n\n🏬 *Shop Nu Address*:\nRaj Nagar complex, Rajnagar Society, Paldi, Ahmedabad, Gujarat 380007\n🗺️ *Location*: https://maps.app.goo.gl/WFEzKEH5bHYWm6DRA\n⏰ *Dukan No Samay*: 9:00 AM – 8:30 PM\n\n{after_hours_note}Kripa kari shop na samay darmiyan tamara kapda aapi jasho. Ashirwad Cleaners ne pasand karva mate aabhar!"
+    },
+    "ORDER_CANCELLED_THANK_YOU": {
+        "ENGLISH": "🙏 Thank you for contacting Ashirwad Cleaners! Your order has been cancelled. Feel free to message us whenever you need our services. Have a wonderful day!",
+        "HINGLISH": "🙏 Ashirwad Cleaners se judne ke liye shukriya! Aapka order cancel kar diya gaya hai. Jab bhi aapko service ki zaroorat ho, humein zaroor message karein. Aapka din shubh ho!",
+        "GUJLISH": "🙏 Ashirwad Cleaners no sampark karva badal aabhar! Aapno order cancel kari didho che. Jyare pan tamne service ni jarur hoy, amne zaroor message karjo. Aapno divas subh rahe!"
     }
 }
 

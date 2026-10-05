@@ -27,7 +27,7 @@ def match_button_synonym(text: str, state: str) -> str:
     clean_text = text.strip().lower()
     
     # If the user clicked the button directly
-    if clean_text in ["btn_redeem_yes", "btn_redeem_no", "btn_addr_yes", "btn_addr_new"]:
+    if clean_text in ["btn_redeem_yes", "btn_redeem_no", "btn_addr_yes", "btn_addr_new", "btn_outside_store_drop", "btn_outside_paldi_addr", "btn_outside_cancel"]:
         return text.strip()
         
     if state == "PICKUP_AWAITING_POINTS_REDEEM":
@@ -45,6 +45,27 @@ def match_button_synonym(text: str, state: str) -> str:
             return "btn_addr_yes"
         if clean_text in new_syns:
             return "btn_addr_new"
+
+    elif state == "PICKUP_AWAITING_OUTSIDE_PALDI_CHOICE":
+        store_syns = [
+            "drop at store", "store drop", "drop off", "drop", "store", "shop", "shop drop",
+            "dukaan", "shop par", "shop aapo", "dukaan par", "self drop", "shop par drop",
+            "shop par aapo", "store par", "1"
+        ]
+        addr_syns = [
+            "paldi address", "paldi", "new address", "address", "enter address", "change address",
+            "naya address", "navu address", "different address", "another address", "2"
+        ]
+        cancel_syns = [
+            "cancel", "cancel order", "radd", "chodi do", "band karo", "cancel karo",
+            "nahi", "no", "stop", "don't want", "3"
+        ]
+        if clean_text in store_syns:
+            return "btn_outside_store_drop"
+        if clean_text in addr_syns:
+            return "btn_outside_paldi_addr"
+        if clean_text in cancel_syns:
+            return "btn_outside_cancel"
             
     return text
 
@@ -376,6 +397,80 @@ def pickup_points_node(state: dict) -> Dict[str, Any]:
     updates = {"points_redeemed": points_redeemed}
     return trigger_address_verification(state, updates)
 
+STORE_ADDRESS = "Raj Nagar complex, Rajnagar Society, Paldi, Ahmedabad, Gujarat 380007"
+STORE_MAPS_LINK = "https://maps.app.goo.gl/WFEzKEH5bHYWm6DRA"
+
+def prompt_outside_paldi_options(state: dict) -> dict:
+    lang = state["language"]
+    buttons = [
+        {"id": "btn_outside_store_drop", "title": t("BTN_OUTSIDE_STORE_DROP", lang)},
+        {"id": "btn_outside_paldi_addr", "title": t("BTN_OUTSIDE_PALDI_ADDR", lang)},
+        {"id": "btn_outside_cancel", "title": t("BTN_OUTSIDE_CANCEL", lang)}
+    ]
+    send_interactive_buttons(state["phone_number"], t("OUTSIDE_PALDI_OPTIONS", lang), buttons)
+    return {
+        "current_state": "PICKUP_AWAITING_OUTSIDE_PALDI_CHOICE",
+        "response_sent": True
+    }
+
+def handle_store_drop_order(state: dict) -> dict:
+    lang = state["language"]
+    points_redeemed = state.get("points_redeemed", 0)
+    base_estimate = state.get("base_estimate", 0.0)
+    final_estimate = max(0.0, base_estimate - points_redeemed)
+    
+    with SessionLocal() as db:
+        order = create_order(
+            db,
+            state["customer_id"],
+            state["item_count"],
+            order_type="STORE_DROP",
+            service_category=", ".join(list(set([g["service_category"] for g in state["garments_list"] if "service_category" in g])) or ["Dry Clean"]),
+            flat_address=f"Store Drop-off: {STORE_ADDRESS}",
+            estimated_amount=base_estimate,
+            delivery_fee=0.0,
+            points_redeemed=points_redeemed,
+            special_instructions="Self drop-off at store by customer",
+            disclaimer_accepted=True,
+            garments_list=state.get("garments_list", [])
+        )
+        order_id = clean_order_id(order.order_id)
+        
+    items_summary = build_items_summary(state.get("garments_list", []))
+    
+    if points_redeemed > 0:
+        promo_msg = t("POINTS_APPLIED_MSG", lang, points_redeemed=points_redeemed)
+    else:
+        promo_msg = ""
+        
+    after_hours_note = t("AFTER_HOURS_STORE_NOTE", lang) if is_after_hours() else ""
+    
+    send_text_message(
+        state["phone_number"],
+        t("ORDER_SUCCESS_STORE_DROP",
+          lang,
+          order_id=order_id,
+          items_summary=items_summary,
+          base_estimate=f"{base_estimate:.1f}",
+          delivery_str="₹0 (Self Drop-off)",
+          promo_msg=promo_msg,
+          final_estimate=f"{final_estimate:.1f}",
+          after_hours_note=after_hours_note
+        )
+    )
+    
+    return {
+        "current_flow": "IDLE",
+        "current_state": "",
+        "garments_list": [],
+        "item_count": 0,
+        "points_redeemed": 0,
+        "saved_address": "",
+        "pending_items_input": "",
+        "direct_order_prefix": "",
+        "response_sent": True
+    }
+
 def pickup_address_node(state: dict) -> Dict[str, Any]:
     """
     Handles address verification and Paldi boundaries validation. Creates orders.
@@ -384,6 +479,37 @@ def pickup_address_node(state: dict) -> Dict[str, Any]:
     text = state["text_input"]
     curr_state = state["current_state"]
     flat_address = ""
+    
+    if curr_state == "PICKUP_AWAITING_OUTSIDE_PALDI_CHOICE":
+        button_id = match_button_synonym(text, curr_state)
+        if button_id == "btn_outside_store_drop":
+            return handle_store_drop_order(state)
+        elif button_id == "btn_outside_paldi_addr":
+            send_text_message(state["phone_number"], t("ASK_NEW_PALDI_ADDRESS", lang))
+            return {
+                "current_state": "PICKUP_AWAITING_CONFIRMATION_ADDRESS",
+                "response_sent": True
+            }
+        elif button_id == "btn_outside_cancel":
+            send_text_message(state["phone_number"], t("ORDER_CANCELLED_THANK_YOU", lang))
+            return {
+                "current_flow": "IDLE",
+                "current_state": "",
+                "garments_list": [],
+                "item_count": 0,
+                "points_redeemed": 0,
+                "saved_address": "",
+                "pending_items_input": "",
+                "direct_order_prefix": "",
+                "response_sent": True
+            }
+        else:
+            # Check if user directly replied with an address/coordinates
+            clean_text = text.strip()
+            if is_in_paldi_text(clean_text) or extract_coords_from_url(clean_text) or ("," in clean_text and any(c.isdigit() for c in clean_text)):
+                curr_state = "PICKUP_AWAITING_CONFIRMATION_ADDRESS"
+            else:
+                return prompt_outside_paldi_options(state)
     
     if curr_state == "PICKUP_AWAITING_ADDRESS_BUTTON":
         button_id = match_button_synonym(text, curr_state)
@@ -436,19 +562,16 @@ def pickup_address_node(state: dict) -> Dict[str, Any]:
             if is_gps or "google.com/maps" in flat_address or "maps.google.com" in flat_address:
                 if is_gps:
                     if not is_in_paldi_coordinate(lat_val, lon_val):
-                        send_text_message(state["phone_number"], t("OUTSIDE_PALDI_GPS", lang))
-                        return {"response_sent": True}
+                        return prompt_outside_paldi_options(state)
                     update_customer_location(db, state["customer_id"], f"https://www.google.com/maps/search/?api=1&query={lat_val},{lon_val}")
                 else:
                     if not is_in_paldi_text(flat_address):
-                        send_text_message(state["phone_number"], t("OUTSIDE_PALDI_TEXT", lang))
-                        return {"response_sent": True}
+                        return prompt_outside_paldi_options(state)
                     update_customer_location(db, state["customer_id"], flat_address)
                 flat_address = "Provided via GPS Pin"
             else:
                 if not is_in_paldi_text(flat_address):
-                    send_text_message(state["phone_number"], t("OUTSIDE_PALDI_TEXT", lang))
-                    return {"response_sent": True}
+                    return prompt_outside_paldi_options(state)
                 update_customer_saved_address(db, state["customer_id"], flat_address)
         
     with SessionLocal() as db:

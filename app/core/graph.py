@@ -113,12 +113,12 @@ def classifier_node(state: BotState) -> Dict[str, Any]:
         if text.startswith("btn_"):
             return {"response_sent": False}
             
-        if state.get("current_state") in ["PICKUP_AWAITING_NAME", "PICKUP_AWAITING_CONFIRMATION_ADDRESS"]:
+        if state.get("current_state") in ["PICKUP_AWAITING_NAME", "PICKUP_AWAITING_CONFIRMATION_ADDRESS", "PICKUP_AWAITING_OUTSIDE_PALDI_CHOICE"]:
             return {"response_sent": False}
             
-        if state.get("current_state") in ["PICKUP_AWAITING_POINTS_REDEEM", "PICKUP_AWAITING_ADDRESS_BUTTON"]:
+        if state.get("current_state") in ["PICKUP_AWAITING_POINTS_REDEEM", "PICKUP_AWAITING_ADDRESS_BUTTON", "PICKUP_AWAITING_OUTSIDE_PALDI_CHOICE"]:
             syn = match_button_synonym(text, state["current_state"])
-            if syn in ["btn_redeem_yes", "btn_redeem_no", "btn_addr_yes", "btn_addr_new"]:
+            if syn in ["btn_redeem_yes", "btn_redeem_no", "btn_addr_yes", "btn_addr_new", "btn_outside_store_drop", "btn_outside_paldi_addr", "btn_outside_cancel"]:
                 return {"response_sent": False}
                 
         intent, detected_lang = classify_intent(text)
@@ -265,7 +265,7 @@ def route_next_node(state: BotState) -> str:
             return "pickup_items"
         elif curr_state == "PICKUP_AWAITING_POINTS_REDEEM":
             return "pickup_points"
-        elif curr_state in ["PICKUP_AWAITING_ADDRESS_BUTTON", "PICKUP_AWAITING_CONFIRMATION_ADDRESS"]:
+        elif curr_state in ["PICKUP_AWAITING_ADDRESS_BUTTON", "PICKUP_AWAITING_CONFIRMATION_ADDRESS", "PICKUP_AWAITING_OUTSIDE_PALDI_CHOICE"]:
             return "pickup_address"
             
     return END

@@ -210,7 +210,7 @@ def update_order_status(order_id: str, req: UpdateStatusRequest, db: Session = D
     if new_status in requires_amount and (order.total_amount is None or order.total_amount <= 0):
         raise HTTPException(status_code=400, detail="Total Amount must be saved before moving to PROCESSING, READY, or DELIVERED.")
 
-    if order.status.name == "PENDING_PICKUP" and new_status not in ["PENDING_PICKUP", "CANCELLED", "REJECTED"] and not order.runner_id:
+    if order.order_type.name == "PICKUP" and order.status.name == "PENDING_PICKUP" and new_status not in ["PENDING_PICKUP", "CANCELLED", "REJECTED"] and not order.runner_id:
         raise HTTPException(status_code=400, detail="A Delivery Runner must be dispatched before moving past PENDING_PICKUP.")
 
     if new_status == "DELIVERED" and new_payment != "PAID":
@@ -292,6 +292,7 @@ def dispatch_runner(order_id: str, req: DispatchRunnerRequest, db: Session = Dep
 
     customer_phone = order.customer.phone_number if order.customer else "N/A"
     customer_name = order.customer.name if order.customer and order.customer.name else "Unknown"
+    location = (order.customer.last_location_gps if order.customer and order.customer.last_location_gps else order.flat_address) or "No Location Provided"
     from app.services.crud import get_google_maps_url
     maps_link = get_google_maps_url(location) if location != "No Location Provided" else "No link available."
     if not maps_link:
