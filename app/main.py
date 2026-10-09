@@ -4,7 +4,7 @@ import traceback
 from datetime import datetime, time
 from zoneinfo import ZoneInfo
 from fastapi import FastAPI, Request, BackgroundTasks, HTTPException
-from fastapi.responses import PlainTextResponse, RedirectResponse
+from fastapi.responses import PlainTextResponse, RedirectResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 
@@ -168,8 +168,21 @@ async def receive_webhook(request: Request, background_tasks: BackgroundTasks):
 async def admin_redirect():
     return RedirectResponse(url="/")
 
+@app.get("/chat")
+async def chat_spa_page():
+    if os.path.exists("frontend/dist/index.html"):
+        return FileResponse("frontend/dist/index.html")
+    return RedirectResponse(url="/")
+
+@app.get("/chat/{full_path:path}")
+async def chat_spa_subpath_page(full_path: str):
+    if os.path.exists("frontend/dist/index.html"):
+        return FileResponse("frontend/dist/index.html")
+    return RedirectResponse(url="/")
+
 # Mount built frontend at bottom so explicit API & Webhook routes take precedence
 if os.path.exists("frontend/dist"):
     app.mount("/", StaticFiles(directory="frontend/dist", html=True), name="frontend_root")
+
 
 

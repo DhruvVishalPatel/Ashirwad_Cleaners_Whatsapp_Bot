@@ -28,6 +28,7 @@ export default function ChatMessenger({ wsEvent }) {
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [sending, setSending] = useState(false);
   const [togglingBot, setTogglingBot] = useState(false);
+  const [chatError, setChatError] = useState(null);
 
   const messagesEndRef = useRef(null);
 
@@ -38,6 +39,7 @@ export default function ChatMessenger({ wsEvent }) {
   // Load chat threads
   const loadChats = async (isSilent = false) => {
     if (!isSilent) setLoadingChats(true);
+    setChatError(null);
     try {
       const data = await api.getChats();
       setChats(data || []);
@@ -46,6 +48,9 @@ export default function ChatMessenger({ wsEvent }) {
       }
     } catch (err) {
       console.error('Error loading chats:', err);
+      if (!isSilent) {
+        setChatError(err.message || 'Failed to connect to Chat API');
+      }
     } finally {
       if (!isSilent) setLoadingChats(false);
     }
@@ -191,7 +196,15 @@ export default function ChatMessenger({ wsEvent }) {
         </div>
 
         <div className="chat-threads-list">
-          {loadingChats ? (
+          {chatError ? (
+            <div className="alert-banner alert-error" style={{ margin: '1rem', flexDirection: 'column', textAlign: 'center', gap: '0.5rem' }}>
+              <AlertCircle size={20} />
+              <div style={{ fontSize: '0.82rem' }}>{chatError}</div>
+              <button className="btn btn-secondary btn-sm" onClick={() => loadChats()}>
+                <RefreshCw size={12} /> Retry
+              </button>
+            </div>
+          ) : loadingChats ? (
             <div className="loading-state" style={{ padding: '2rem 1rem', textAlign: 'center', color: 'var(--text-muted)' }}>
               <RefreshCw size={24} className="spin-icon" style={{ marginBottom: '0.5rem' }} />
               <div>Loading conversations...</div>
