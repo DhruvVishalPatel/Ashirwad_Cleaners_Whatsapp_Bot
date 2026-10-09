@@ -306,41 +306,43 @@ export default function App() {
       </div>
 
       {/* Tab Content */}
-      <div className="glass-card" style={{ minHeight: '500px' }}>
-        {activeTab === 'chat' && (
-          <ChatMessenger wsEvent={lastWsEvent} />
-        )}
+      {activeTab === 'chat' && (
+        <ChatMessenger wsEvent={lastWsEvent} />
+      )}
 
-        {activeTab === 'orders' && (
-          <OrderManagement
-            orders={orders}
-            runners={runners}
-            catalog={catalog}
-            onRefresh={(showAll) => fetchAllData(showAll)}
-          />
-        )}
+      {activeTab !== 'chat' && (
+        <div className="glass-card" style={{ minHeight: '500px' }}>
+          {activeTab === 'orders' && (
+            <OrderManagement
+              orders={orders}
+              runners={runners}
+              catalog={catalog}
+              onRefresh={(showAll) => fetchAllData(showAll)}
+            />
+          )}
 
-        {activeTab === 'customers' && (
-          <CustomerDirectory
-            customers={customers}
-            onRefresh={() => fetchAllData()}
-          />
-        )}
+          {activeTab === 'customers' && (
+            <CustomerDirectory
+              customers={customers}
+              onRefresh={() => fetchAllData()}
+            />
+          )}
 
-        {activeTab === 'runners' && (
-          <StaffManager
-            runners={runners}
-            onRefresh={() => fetchAllData()}
-          />
-        )}
+          {activeTab === 'runners' && (
+            <StaffManager
+              runners={runners}
+              onRefresh={() => fetchAllData()}
+            />
+          )}
 
-        {activeTab === 'catalog' && (
-          <CatalogManager
-            catalog={catalog}
-            onRefresh={() => fetchAllData()}
-          />
-        )}
-      </div>
+          {activeTab === 'catalog' && (
+            <CatalogManager
+              catalog={catalog}
+              onRefresh={() => fetchAllData()}
+            />
+          )}
+        </div>
+      )}
     </div>
   );
 }

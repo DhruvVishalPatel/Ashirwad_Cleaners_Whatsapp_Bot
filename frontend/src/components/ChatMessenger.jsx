@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { api, getGoogleMapsUrl } from '../api';
+import { api } from '../api';
 import {
   MessageSquare,
   Send,
@@ -12,10 +12,9 @@ import {
   Clock,
   Bot,
   UserCheck,
-  Package,
-  Sparkles,
   RefreshCw,
-  AlertCircle
+  AlertCircle,
+  ArrowLeft
 } from 'lucide-react';
 
 export default function ChatMessenger({ wsEvent }) {
@@ -29,6 +28,9 @@ export default function ChatMessenger({ wsEvent }) {
   const [sending, setSending] = useState(false);
   const [togglingBot, setTogglingBot] = useState(false);
   const [chatError, setChatError] = useState(null);
+  
+  // Mobile navigation state
+  const [showMobileChat, setShowMobileChat] = useState(false);
 
   const messagesEndRef = useRef(null);
 
@@ -87,18 +89,16 @@ export default function ChatMessenger({ wsEvent }) {
   // Handle incoming real-time WebSocket events
   useEffect(() => {
     if (!wsEvent) return;
-    if (wsEvent.event === 'CHAT_MESSAGE_RECEIVED') {
+    if (wsEvent.type === 'CHAT_MESSAGE_RECEIVED' || wsEvent.event === 'CHAT_MESSAGE_RECEIVED') {
       const payload = wsEvent.data;
-      // Refresh chat list to update last message snippet & order
       loadChats(true);
-      // If event belongs to currently selected customer, add to message list
       if (selectedCustomerId && payload.customer_id === selectedCustomerId) {
         setMessages((prev) => {
           if (prev.some((m) => m.id === payload.id)) return prev;
           return [...prev, payload];
         });
       }
-    } else if (wsEvent.event === 'CHAT_BOT_TOGGLED') {
+    } else if (wsEvent.type === 'CHAT_BOT_TOGGLED' || wsEvent.event === 'CHAT_BOT_TOGGLED') {
       const payload = wsEvent.data;
       setChats((prev) =>
         prev.map((c) =>
@@ -112,6 +112,11 @@ export default function ChatMessenger({ wsEvent }) {
 
   const selectedCustomer = chats.find((c) => c.customer_id === selectedCustomerId);
 
+  const handleSelectCustomer = (customerId) => {
+    setSelectedCustomerId(customerId);
+    setShowMobileChat(true);
+  };
+
   const handleSendMessage = async (e) => {
     e?.preventDefault();
     if (!inputMessage.trim() || !selectedCustomerId || sending) return;
@@ -122,7 +127,6 @@ export default function ChatMessenger({ wsEvent }) {
 
     try {
       await api.sendChatMessage(selectedCustomerId, msgText);
-      // Optimistic refresh
       await loadMessages(selectedCustomerId, true);
       await loadChats(true);
     } catch (err) {
@@ -166,25 +170,25 @@ export default function ChatMessenger({ wsEvent }) {
   ];
 
   return (
-    <div className="chat-messenger-container">
+    <div className={`chat-messenger-container ${showMobileChat ? 'mobile-chat-active' : ''}`}>
       {/* LEFT SIDEBAR: Threads List */}
       <div className="chat-sidebar">
         <div className="chat-sidebar-header">
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.8rem' }}>
-            <h2 style={{ fontSize: '1.15rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
-              <MessageSquare size={20} className="text-primary" /> Live Messages
+            <h2 style={{ fontSize: '1.1rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
+              <MessageSquare size={18} className="text-primary" /> Live Messages
             </h2>
             <button
               className="btn btn-secondary btn-icon"
               onClick={() => loadChats()}
               title="Refresh Chats"
-              style={{ padding: '0.35rem' }}
+              style={{ padding: '0.35rem 0.5rem' }}
             >
               <RefreshCw size={14} />
             </button>
           </div>
           <div className="search-input-wrapper">
-            <Search size={16} className="search-icon" />
+            <Search size={15} className="search-icon" />
             <input
               type="text"
               placeholder="Search customer or phone..."
@@ -220,7 +224,7 @@ export default function ChatMessenger({ wsEvent }) {
                 <div
                   key={chat.customer_id}
                   className={`chat-thread-item ${isSelected ? 'active' : ''}`}
-                  onClick={() => setSelectedCustomerId(chat.customer_id)}
+                  onClick={() => handleSelectCustomer(chat.customer_id)}
                 >
                   <div className="avatar-circle">
                     {chat.customer_name ? chat.customer_name.charAt(0).toUpperCase() : 'C'}
@@ -236,8 +240,8 @@ export default function ChatMessenger({ wsEvent }) {
                       <span className="last-message-snippet">
                         {chat.last_message ? (
                           <>
-                            {chat.last_message.sender_type === 'MANAGER' && <strong style={{ color: '#60a5fa' }}>Faizan: </strong>}
-                            {chat.last_message.sender_type === 'BOT' && <strong style={{ color: '#a78bfa' }}>Bot: </strong>}
+                            {chat.last_message.sender_type === 'MANAGER' && <strong style={{ color: '#3b82f6' }}>Faizan: </strong>}
+                            {chat.last_message.sender_type === 'BOT' && <strong style={{ color: '#a855f7' }}>Bot: </strong>}
                             {chat.last_message.content}
                           </>
                         ) : (
@@ -272,25 +276,32 @@ export default function ChatMessenger({ wsEvent }) {
             {/* CHAT HEADER */}
             <div className="chat-header">
               <div className="chat-header-user">
+                <button
+                  className="btn btn-secondary btn-icon mobile-back-btn"
+                  onClick={() => setShowMobileChat(false)}
+                  title="Back to All Chats"
+                >
+                  <ArrowLeft size={16} />
+                </button>
                 <div className="avatar-circle avatar-lg">
                   {selectedCustomer.customer_name ? selectedCustomer.customer_name.charAt(0).toUpperCase() : 'C'}
                 </div>
                 <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                     <h3 className="chat-customer-title">{selectedCustomer.customer_name}</h3>
                     {selectedCustomer.has_active_order && (
                       <span className="badge badge-order">
-                        Active Order #{selectedCustomer.active_order_id} ({selectedCustomer.active_order_status})
+                        Order #{selectedCustomer.active_order_id} ({selectedCustomer.active_order_status})
                       </span>
                     )}
                   </div>
                   <div className="chat-customer-sub">
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
-                      <Phone size={13} /> {selectedCustomer.phone_number}
+                      <Phone size={12} /> {selectedCustomer.phone_number}
                     </span>
                     {selectedCustomer.saved_address && (
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', marginLeft: '0.8rem' }}>
-                        <MapPin size={13} /> {selectedCustomer.saved_address}
+                      <span className="customer-address-snippet">
+                        <MapPin size={12} /> {selectedCustomer.saved_address}
                       </span>
                     )}
                   </div>
@@ -306,12 +317,12 @@ export default function ChatMessenger({ wsEvent }) {
                 >
                   {selectedCustomer.bot_paused ? (
                     <>
-                      <PauseCircle size={18} />
-                      <span>AI Bot PAUSED (Human Mode)</span>
+                      <PauseCircle size={16} />
+                      <span>AI Bot PAUSED</span>
                     </>
                   ) : (
                     <>
-                      <PlayCircle size={18} />
+                      <PlayCircle size={16} />
                       <span>AI Bot ACTIVE</span>
                     </>
                   )}
@@ -329,7 +340,7 @@ export default function ChatMessenger({ wsEvent }) {
               ) : messages.length === 0 ? (
                 <div className="empty-feed">
                   <MessageSquare size={48} opacity={0.3} />
-                  <p>No chat history available for this customer yet.</p>
+                  <p style={{ marginTop: '0.5rem' }}>No message history available for this customer yet.</p>
                 </div>
               ) : (
                 messages.map((msg) => {
@@ -369,7 +380,7 @@ export default function ChatMessenger({ wsEvent }) {
 
             {/* QUICK REPLIES BAR */}
             <div className="quick-replies-bar">
-              <span className="quick-replies-label">Quick Replies:</span>
+              <span className="quick-replies-label">Quick:</span>
               <div className="quick-replies-chips">
                 {quickReplies.map((qr, idx) => (
                   <button
@@ -395,15 +406,15 @@ export default function ChatMessenger({ wsEvent }) {
                 disabled={sending}
               />
               <button type="submit" className="btn btn-primary btn-send" disabled={sending || !inputMessage.trim()}>
-                <Send size={16} /> Send
+                <Send size={15} /> Send
               </button>
             </form>
           </>
         ) : (
           <div className="empty-chat-selection">
-            <MessageSquare size={64} opacity={0.2} />
-            <h3>Select a Conversation</h3>
-            <p>Choose a customer thread from the left menu to view messages or reply directly.</p>
+            <MessageSquare size={56} opacity={0.25} />
+            <h3 style={{ marginTop: '1rem', fontSize: '1.1rem' }}>Select a Conversation</h3>
+            <p style={{ fontSize: '0.85rem' }}>Choose a customer thread from the left menu to view messages or reply directly.</p>
           </div>
         )}
       </div>
