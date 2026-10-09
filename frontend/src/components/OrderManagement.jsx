@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Search, Edit3, X, Plus, Trash2, MapPin, Send, AlertTriangle, Lock, CheckCircle2 } from 'lucide-react';
 import { api, getGoogleMapsUrl } from '../api';
 
@@ -38,6 +39,31 @@ export default function OrderManagement({ orders, runners, catalog, onRefresh })
 
   // UI status messages
   const [modalMessage, setModalMessage] = useState({ type: '', text: '' });
+
+  // Prevent background scrolling and support ESC key while modal is open
+  useEffect(() => {
+    const isModalOpen = Boolean(selectedOrder || showDeliveryConfirmModal);
+    if (!isModalOpen) return;
+
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        if (showDeliveryConfirmModal) {
+          setShowDeliveryConfirmModal(false);
+        } else if (selectedOrder) {
+          closeModal();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [selectedOrder, showDeliveryConfirmModal]);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
@@ -355,7 +381,7 @@ export default function OrderManagement({ orders, runners, catalog, onRefresh })
       </div>
 
       {/* MANAGE ORDER MODAL */}
-      {selectedOrder && (
+      {selectedOrder && typeof document !== 'undefined' && createPortal(
         <div className="modal-overlay" onClick={closeModal}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
@@ -599,7 +625,7 @@ export default function OrderManagement({ orders, runners, catalog, onRefresh })
                 <h5 style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--accent-danger)', marginBottom: '0.75rem' }}>
                   ⚠️ Danger Zone
                 </h5>
-                <div style={{ display: 'flex', gap: '0.75rem' }}>
+                <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
                   <button className="btn btn-danger btn-sm" onClick={handleRejectOrder} disabled={isSaving}>
                     Reject (Outside Paldi)
                   </button>
@@ -610,13 +636,14 @@ export default function OrderManagement({ orders, runners, catalog, onRefresh })
               </div>
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* CONFIRM DELIVERY DIALOG MODAL */}
-      {showDeliveryConfirmModal && selectedOrder && (
-        <div className="modal-overlay" style={{ zIndex: 2000 }}>
-          <div className="modal-content" style={{ maxWidth: '500px', border: '1px solid rgba(239, 68, 68, 0.4)' }}>
+      {showDeliveryConfirmModal && selectedOrder && typeof document !== 'undefined' && createPortal(
+        <div className="modal-overlay" style={{ zIndex: 2000 }} onClick={() => setShowDeliveryConfirmModal(false)}>
+          <div className="modal-content" style={{ maxWidth: '500px', border: '1px solid rgba(239, 68, 68, 0.4)' }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <AlertTriangle size={22} color="var(--accent-primary)" /> Confirm Final Delivery
@@ -660,7 +687,8 @@ export default function OrderManagement({ orders, runners, catalog, onRefresh })
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
