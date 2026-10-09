@@ -35,10 +35,27 @@ class Customer(Base):
     last_location_gps = Column(String, nullable=True) # e.g., "lat,long"
     order_count = Column(Integer, default=0)
     preferred_language = Column(String, default="ENGLISH", nullable=True)
+    bot_paused = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     
     orders = relationship("Order", back_populates="customer")
     point_transactions = relationship("PointTransaction", back_populates="customer")
+    chat_messages = relationship("ChatMessage", back_populates="customer")
+
+class ChatMessage(Base):
+    __tablename__ = "chat_messages"
+
+    id = Column(Integer, primary_key=True, index=True)
+    customer_id = Column(Integer, ForeignKey("customers.customer_id"), nullable=False, index=True)
+    phone_number = Column(String, nullable=False, index=True)
+    sender_type = Column(String, nullable=False) # "CUSTOMER", "BOT", "MANAGER"
+    message_type = Column(String, default="text") # "text", "interactive", "image", "location"
+    content = Column(String, nullable=False)
+    media_url = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    customer = relationship("Customer", back_populates="chat_messages")
+
 
 class PointTransaction(Base):
     __tablename__ = "point_transactions"

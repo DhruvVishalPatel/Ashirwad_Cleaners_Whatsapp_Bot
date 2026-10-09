@@ -1,7 +1,8 @@
 from typing import Any, List, Dict, Optional
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
-from app.models.schemas import Customer, Order, OrderItem, Runner, PointTransaction, OrderType
+from app.models.schemas import Customer, Order, OrderItem, Runner, PointTransaction, OrderType, ChatMessage
+
 
 def get_customer(db: Session, phone_number: str):
     return db.query(Customer).filter(Customer.phone_number == phone_number).first()
@@ -210,4 +211,119 @@ def update_customer_language(db: Session, customer_id: int, language: str):
         db.commit()
         db.refresh(customer)
     return customer
+
+def log_chat_message(
+    db: Session,
+    customer_id: int,
+    phone_number: str,
+    sender_type: str,
+    content: str,
+    message_type: str = "text",
+    media_url: str = None
+) -> ChatMessage:
+    msg = ChatMessage(
+        customer_id=customer_id,
+        phone_number=phone_number,
+        sender_type=sender_type,
+        message_type=message_type,
+        content=content,
+        media_url=media_url,
+        created_at=now_ist()
+    )
+    db.add(msg)
+    db.commit()
+    db.refresh(msg)
+
+    # Broadcast real-time WS event
+    try:
+        from app.core.ws_manager import broadcast_event_sync
+        broadcast_event_sync("CHAT_MESSAGE_RECEIVED", {
+            "id": msg.id,
+            "customer_id": msg.customer_id,
+            "phone_number": msg.phone_number,
+            "sender_type": msg.sender_type,
+            "message_type": msg.message_type,
+            "content": msg.content,
+            "media_url": msg.media_url,
+            "created_at": msg.created_at.isoformat() if msg.created_at else None,
+            "created_at_formatted": msg.created_at.strftime("%I:%M %p") if msg.created_at else ""
+        })
+    except Exception:
+        pass
+
+    return msg
+
+def get_customer_chats(db: Session):
+    customers = db.query(Customer).all()
+    chat_list = []
+    for c in customers:
+        last_msg = db.query(ChatMessage).filter(
+            ChatMessage.customer_id == c.customer_id
+        ).order_by(ChatMessage.created_at.desc()).first()
+
+        active_orders = get_active_orders(db, c.customer_id)
+
+        chat_list.append({
+            "customer_id": c.customer_id,
+            "customer_name": c.name or "Unknown",
+            "phone_number": c.phone_number,
+            "saved_address": c.saved_address or "",
+            "last_location_gps": c.last_location_gps or "",
+            "bot_paused": getattr(c, "bot_paused", False) or False,
+            "has_active_order": len(active_orders) > 0,
+            "active_order_id": active_orders[0].order_id if active_orders else None,
+            "active_order_status": active_orders[0].status.name if active_orders else None,
+            "last_message": {
+                "content": last_msg.content if last_msg else "No messages yet",
+                "sender_type": last_msg.sender_type if last_msg else "BOT",
+                "created_at": last_msg.created_at.isoformat() if last_msg and last_msg.created_at else None,
+                "created_at_formatted": last_msg.created_at.strftime("%d %b, %I:%M %p") if last_msg and last_msg.created_at else ""
+            } if last_msg else None
+        })
+
+    # Sort threads by last message created_at descending
+    chat_list.sort(
+        key=lambda x: x["last_message"]["created_at"] if (x["last_message"] and x["last_message"]["created_at"]) else "1970-01-01",
+        reverse=True
+    )
+    return chat_list
+
+def get_chat_history(db: Session, customer_id: int):
+    messages = db.query(ChatMessage).filter(
+        ChatMessage.customer_id == customer_id
+    ).order_by(ChatMessage.created_at.asc()).all()
+
+    return [
+        {
+            "id": m.id,
+            "customer_id": m.customer_id,
+            "phone_number": m.phone_number,
+            "sender_type": m.sender_type,
+            "message_type": m.message_type,
+            "content": m.content,
+            "media_url": m.media_url,
+            "created_at": m.created_at.isoformat() if m.created_at else None,
+            "created_at_formatted": m.created_at.strftime("%I:%M %p") if m.created_at else ""
+        }
+        for m in messages
+    ]
+
+def toggle_customer_bot_pause(db: Session, customer_id: int, paused: bool):
+    customer = db.query(Customer).filter(Customer.customer_id == customer_id).first()
+    if customer:
+        customer.bot_paused = paused
+        db.commit()
+        db.refresh(customer)
+
+        try:
+            from app.core.ws_manager import broadcast_event_sync
+            broadcast_event_sync("CHAT_BOT_TOGGLED", {
+                "customer_id": customer.customer_id,
+                "bot_paused": customer.bot_paused
+            })
+        except Exception:
+            pass
+
+    return customer
+
 

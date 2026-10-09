@@ -6,7 +6,27 @@ WA_PHONE_NUMBER_ID = os.environ.get("WA_PHONE_NUMBER_ID")
 WA_ACCESS_TOKEN = os.environ.get("WA_ACCESS_TOKEN")
 GRAPH_API_VERSION = "v19.0"
 
-def send_text_message(to_number: str, text: str):
+def _auto_log_outbound(to_number: str, content: str, sender_type: str = "BOT", message_type: str = "text", media_url: str = None):
+    try:
+        from app.core.database import SessionLocal
+        from app.services.crud import get_customer, log_chat_message
+        with SessionLocal() as db:
+            customer = get_customer(db, to_number)
+            if customer:
+                log_chat_message(
+                    db,
+                    customer_id=customer.customer_id,
+                    phone_number=to_number,
+                    sender_type=sender_type,
+                    content=content,
+                    message_type=message_type,
+                    media_url=media_url
+                )
+    except Exception:
+        pass
+
+def send_text_message(to_number: str, text: str, sender_type: str = "BOT"):
+    _auto_log_outbound(to_number, text, sender_type=sender_type, message_type="text")
     if not WA_ACCESS_TOKEN:
         print(f"MOCK WA SEND [TEXT] to {to_number}: {text}")
         return {"status": "mocked"}
@@ -26,8 +46,11 @@ def send_text_message(to_number: str, text: str):
     response = requests.post(url, headers=headers, json=payload)
     return response.json()
 
-def send_interactive_buttons(to_number: str, body_text: str, buttons: list):
-    """buttons should be a list of dicts: [{'id': 'btn_1', 'title': 'Yes'}, ...] max 3"""
+def send_interactive_buttons(to_number: str, body_text: str, buttons: list, sender_type: str = "BOT"):
+    btn_titles = ", ".join([f"[{b.get('title')}]" for b in buttons])
+    full_content = f"{body_text}\n{btn_titles}" if btn_titles else body_text
+    _auto_log_outbound(to_number, full_content, sender_type=sender_type, message_type="interactive")
+
     if not WA_ACCESS_TOKEN:
         print(f"MOCK WA SEND [BUTTONS] to {to_number}: {body_text} | Buttons: {buttons}")
         return {"status": "mocked"}
@@ -62,7 +85,10 @@ def send_interactive_buttons(to_number: str, body_text: str, buttons: list):
     response = requests.post(url, headers=headers, json=payload)
     return response.json()
 
-def send_image_message(to_number: str, image_url: str, caption: str = None):
+def send_image_message(to_number: str, image_url: str, caption: str = None, sender_type: str = "BOT"):
+    content = caption or "[Image Message]"
+    _auto_log_outbound(to_number, content, sender_type=sender_type, message_type="image", media_url=image_url)
+
     if not WA_ACCESS_TOKEN:
         print(f"MOCK WA SEND [IMAGE] to {to_number}: {image_url} | Caption: {caption}")
         return {"status": "mocked"}
@@ -86,3 +112,4 @@ def send_image_message(to_number: str, image_url: str, caption: str = None):
         
     response = requests.post(url, headers=headers, json=payload)
     return response.json()
+

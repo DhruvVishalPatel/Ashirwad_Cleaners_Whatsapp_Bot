@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 
 from app.core.database import SessionLocal, init_db
-from app.services.crud import get_customer, create_customer
+from app.services.crud import get_customer, create_customer, log_chat_message
 from app.core.translations import t
 from app.services.whatsapp_sender import send_text_message
 from app.core.graph import compiled_graph
@@ -66,6 +66,22 @@ def process_whatsapp_message(payload: dict):
         if not phone_number:
             return
         
+        msg_type = message.get("type", "text")
+
+        # Handle Interactive vs Text vs Location
+        if msg_type == "interactive":
+            interactive = message.get("interactive", {})
+            if interactive.get("type") == "button_reply":
+                text = interactive.get("button_reply", {}).get("id", "")
+            else:
+                text = "UNKNOWN_INTERACTIVE"
+        elif msg_type == "location":
+            lat = message.get("location", {}).get("latitude")
+            long = message.get("location", {}).get("longitude")
+            text = f"{lat},{long}"
+        else:
+            text = message.get("text", {}).get("body", "")
+
         # 1. Check or Create Customer
         with SessionLocal() as db:
             customer = get_customer(db, phone_number)
@@ -75,24 +91,22 @@ def process_whatsapp_message(payload: dict):
             customer_id = customer.customer_id
             customer_name = customer.name or ""
             lang = customer.preferred_language or ""
+            bot_paused = getattr(customer, "bot_paused", False) or False
+
+            # Log inbound customer message to chat_messages
+            log_chat_message(
+                db,
+                customer_id=customer_id,
+                phone_number=phone_number,
+                sender_type="CUSTOMER",
+                content=text if text else f"[{msg_type.upper()} MESSAGE]",
+                message_type=msg_type
+            )
             
-        # 24/7 Order Processing Enabled
-        # (After-hours pickup notifications are attached to order confirmations)
-        
-        # Handle Interactive vs Text vs Location
-        if message.get("type") == "interactive":
-            interactive = message.get("interactive", {})
-            if interactive.get("type") == "button_reply":
-                text = interactive.get("button_reply", {}).get("id", "")
-            else:
-                text = "UNKNOWN_INTERACTIVE"
-        elif message.get("type") == "location":
-            lat = message.get("location", {}).get("latitude")
-            long = message.get("location", {}).get("longitude")
-            text = f"{lat},{long}"
-        else:
-            text = message.get("text", {}).get("body", "")
-            
+        if bot_paused:
+            logger.info(f"Bot AI is paused for customer {phone_number} ({customer_name}). Skipping auto reply.")
+            return
+
         # 2. RUN LANGGRAPH AGENT ENGINE
         config = {"configurable": {"thread_id": phone_number}}
         

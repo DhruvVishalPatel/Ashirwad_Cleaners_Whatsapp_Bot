@@ -77,3 +77,5 @@ logs/
 frontend/node_modules/
 frontend/dist/
 
+# Server Command
+server_code.txt

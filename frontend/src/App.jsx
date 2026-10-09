@@ -5,9 +5,10 @@ import OrderManagement from './components/OrderManagement';
 import CustomerDirectory from './components/CustomerDirectory';
 import StaffManager from './components/StaffManager';
 import CatalogManager from './components/CatalogManager';
+import ChatMessenger from './components/ChatMessenger';
 import LoginScreen from './components/LoginScreen';
 import { api, getAuthToken, setAuthToken } from './api';
-import { ShoppingBag, Users, Truck, Tag, Bell } from 'lucide-react';
+import { ShoppingBag, Users, Truck, Tag, Bell, MessageSquare } from 'lucide-react';
 
 function playNewOrderChime() {
   try {
@@ -31,11 +32,26 @@ function playNewOrderChime() {
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'dark');
-  const [activeTab, setActiveTab] = useState('orders');
+  const [activeTab, setActiveTab] = useState(
+    window.location.pathname === '/chat' ? 'chat' : 'orders'
+  );
+
+  // Sync route with tab selection
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    if (tab === 'chat') {
+      window.history.pushState(null, '', '/chat');
+    } else {
+      if (window.location.pathname === '/chat') {
+        window.history.pushState(null, '', '/');
+      }
+    }
+  };
 
   // Real-time WebSocket State
   const [wsConnected, setWsConnected] = useState(false);
   const [toastNotification, setToastNotification] = useState(null);
+  const [lastWsEvent, setLastWsEvent] = useState(null);
   const wsRef = useRef(null);
 
   // Data states
@@ -55,6 +71,19 @@ export default function App() {
   const toggleTheme = () => {
     setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
   };
+
+  // Handle browser back/forward buttons
+  useEffect(() => {
+    const handlePopState = () => {
+      if (window.location.pathname === '/chat') {
+        setActiveTab('chat');
+      } else {
+        setActiveTab('orders');
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   // Verify Auth on mount
   useEffect(() => {
@@ -123,6 +152,7 @@ export default function App() {
         try {
           if (event.data === 'pong') return;
           const msg = JSON.parse(event.data);
+          setLastWsEvent(msg);
           
           if (msg.type === 'ORDER_CREATED') {
             playNewOrderChime();
@@ -137,6 +167,14 @@ export default function App() {
               body: `Order #${msg.data.order_id} state updated.`,
             });
             fetchAllData();
+          } else if (msg.type === 'CHAT_MESSAGE_RECEIVED') {
+            if (msg.data.sender_type === 'CUSTOMER') {
+              playNewOrderChime();
+              setToastNotification({
+                title: `💬 MESSAGE FROM ${msg.data.phone_number}`,
+                body: msg.data.content,
+              });
+            }
           }
         } catch (e) {
           // Non-JSON message
@@ -232,29 +270,36 @@ export default function App() {
       {/* Main Tabs Header */}
       <div className="tabs-header">
         <button
+          className={`tab-btn ${activeTab === 'chat' ? 'active' : ''}`}
+          onClick={() => handleTabChange('chat')}
+        >
+          <MessageSquare size={18} /> 💬 Live Chats
+        </button>
+
+        <button
           className={`tab-btn ${activeTab === 'orders' ? 'active' : ''}`}
-          onClick={() => setActiveTab('orders')}
+          onClick={() => handleTabChange('orders')}
         >
           <ShoppingBag size={18} /> 📋 Active Orders
         </button>
 
         <button
           className={`tab-btn ${activeTab === 'customers' ? 'active' : ''}`}
-          onClick={() => setActiveTab('customers')}
+          onClick={() => handleTabChange('customers')}
         >
           <Users size={18} /> 👥 Customer Database
         </button>
 
         <button
           className={`tab-btn ${activeTab === 'runners' ? 'active' : ''}`}
-          onClick={() => setActiveTab('runners')}
+          onClick={() => handleTabChange('runners')}
         >
           <Truck size={18} /> 🛵 Staff Settings
         </button>
 
         <button
           className={`tab-btn ${activeTab === 'catalog' ? 'active' : ''}`}
-          onClick={() => setActiveTab('catalog')}
+          onClick={() => handleTabChange('catalog')}
         >
           <Tag size={18} /> 🏷️ Price Catalog Manager
         </button>
@@ -262,6 +307,10 @@ export default function App() {
 
       {/* Tab Content */}
       <div className="glass-card" style={{ minHeight: '500px' }}>
+        {activeTab === 'chat' && (
+          <ChatMessenger wsEvent={lastWsEvent} />
+        )}
+
         {activeTab === 'orders' && (
           <OrderManagement
             orders={orders}
@@ -295,3 +344,4 @@ export default function App() {
     </div>
   );
 }
+

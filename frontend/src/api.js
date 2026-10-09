@@ -130,4 +130,18 @@ export const api = {
     request(`/catalog/${itemId}`, {
       method: 'DELETE',
     }),
+
+  // Live Chat / Messenger
+  getChats: () => request('/chats'),
+  getChatMessages: (customerId) => request(`/chats/${customerId}`),
+  sendChatMessage: (customerId, message) =>
+    request(`/chats/${customerId}/send`, {
+      method: 'POST',
+      body: JSON.stringify({ message }),
+    }),
+  toggleBotPause: (customerId, paused) =>
+    request(`/chats/${customerId}/toggle-bot`, {
+      method: 'PUT',
+      body: JSON.stringify({ paused }),
+    }),
 };
