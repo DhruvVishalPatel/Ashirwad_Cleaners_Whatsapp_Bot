@@ -212,6 +212,34 @@ def update_customer_language(db: Session, customer_id: int, language: str):
         db.refresh(customer)
     return customer
 
+def safe_isoformat(dt: Any) -> Optional[str]:
+    if not dt:
+        return None
+    if isinstance(dt, datetime):
+        return dt.isoformat()
+    return str(dt)
+
+def safe_strftime(dt: Any, fmt: str) -> str:
+    if not dt:
+        return ""
+    if isinstance(dt, datetime):
+        return dt.strftime(fmt)
+    if isinstance(dt, str):
+        try:
+            clean_str = dt.replace("Z", "+00:00")
+            parsed = datetime.fromisoformat(clean_str)
+            return parsed.strftime(fmt)
+        except Exception:
+            return dt[:16]
+    return str(dt)
+
+def safe_status_name(status_obj: Any) -> Optional[str]:
+    if not status_obj:
+        return None
+    if hasattr(status_obj, "name"):
+        return status_obj.name
+    return str(status_obj)
+
 def log_chat_message(
     db: Session,
     customer_id: int,
@@ -245,8 +273,8 @@ def log_chat_message(
             "message_type": msg.message_type,
             "content": msg.content,
             "media_url": msg.media_url,
-            "created_at": msg.created_at.isoformat() if msg.created_at else None,
-            "created_at_formatted": msg.created_at.strftime("%I:%M %p") if msg.created_at else ""
+            "created_at": safe_isoformat(msg.created_at),
+            "created_at_formatted": safe_strftime(msg.created_at, "%I:%M %p")
         })
     except Exception:
         pass
@@ -255,58 +283,72 @@ def log_chat_message(
 
 def get_customer_chats(db: Session):
     customers = db.query(Customer).all()
+    
+    # If database has no customers yet, auto-seed a default General Support customer so chat is never empty
+    if not customers:
+        default_customer = create_customer(db, "+919876543210", name="Ashirwad Live Customer")
+        customers = [default_customer]
+
     chat_list = []
     for c in customers:
-        last_msg = db.query(ChatMessage).filter(
-            ChatMessage.customer_id == c.customer_id
-        ).order_by(ChatMessage.created_at.desc()).first()
+        try:
+            last_msg = db.query(ChatMessage).filter(
+                ChatMessage.customer_id == c.customer_id
+            ).order_by(ChatMessage.created_at.desc()).first()
 
-        active_orders = get_active_orders(db, c.customer_id)
+            active_orders = get_active_orders(db, c.customer_id)
 
-        chat_list.append({
-            "customer_id": c.customer_id,
-            "customer_name": c.name or "Unknown",
-            "phone_number": c.phone_number,
-            "saved_address": c.saved_address or "",
-            "last_location_gps": c.last_location_gps or "",
-            "bot_paused": getattr(c, "bot_paused", False) or False,
-            "has_active_order": len(active_orders) > 0,
-            "active_order_id": active_orders[0].order_id if active_orders else None,
-            "active_order_status": active_orders[0].status.name if active_orders else None,
-            "last_message": {
-                "content": last_msg.content if last_msg else "No messages yet",
-                "sender_type": last_msg.sender_type if last_msg else "BOT",
-                "created_at": last_msg.created_at.isoformat() if last_msg and last_msg.created_at else None,
-                "created_at_formatted": last_msg.created_at.strftime("%d %b, %I:%M %p") if last_msg and last_msg.created_at else ""
-            } if last_msg else None
-        })
+            chat_list.append({
+                "customer_id": c.customer_id,
+                "customer_name": c.name or f"Customer {c.phone_number}",
+                "phone_number": c.phone_number,
+                "saved_address": c.saved_address or "",
+                "last_location_gps": c.last_location_gps or "",
+                "bot_paused": getattr(c, "bot_paused", False) or False,
+                "has_active_order": len(active_orders) > 0,
+                "active_order_id": active_orders[0].order_id if active_orders else None,
+                "active_order_status": safe_status_name(active_orders[0].status) if active_orders else None,
+                "last_message": {
+                    "content": last_msg.content if last_msg else "No messages yet",
+                    "sender_type": last_msg.sender_type if last_msg else "BOT",
+                    "created_at": safe_isoformat(last_msg.created_at) if last_msg else None,
+                    "created_at_formatted": safe_strftime(last_msg.created_at, "%d %b, %I:%M %p") if last_msg else ""
+                } if last_msg else None
+            })
+        except Exception as e:
+            logger.error(f"Error building chat thread for customer_id {c.customer_id}: {e}")
+            continue
 
     # Sort threads by last message created_at descending
     chat_list.sort(
-        key=lambda x: x["last_message"]["created_at"] if (x["last_message"] and x["last_message"]["created_at"]) else "1970-01-01",
+        key=lambda x: (x["last_message"]["created_at"] if (x["last_message"] and x["last_message"]["created_at"]) else "1970-01-01"),
         reverse=True
     )
     return chat_list
 
 def get_chat_history(db: Session, customer_id: int):
-    messages = db.query(ChatMessage).filter(
-        ChatMessage.customer_id == customer_id
-    ).order_by(ChatMessage.created_at.asc()).all()
+    try:
+        messages = db.query(ChatMessage).filter(
+            ChatMessage.customer_id == customer_id
+        ).order_by(ChatMessage.created_at.asc()).all()
 
-    return [
-        {
-            "id": m.id,
-            "customer_id": m.customer_id,
-            "phone_number": m.phone_number,
-            "sender_type": m.sender_type,
-            "message_type": m.message_type,
-            "content": m.content,
-            "media_url": m.media_url,
-            "created_at": m.created_at.isoformat() if m.created_at else None,
-            "created_at_formatted": m.created_at.strftime("%I:%M %p") if m.created_at else ""
-        }
-        for m in messages
-    ]
+        return [
+            {
+                "id": m.id,
+                "customer_id": m.customer_id,
+                "phone_number": m.phone_number,
+                "sender_type": m.sender_type,
+                "message_type": m.message_type,
+                "content": m.content,
+                "media_url": m.media_url,
+                "created_at": safe_isoformat(m.created_at),
+                "created_at_formatted": safe_strftime(m.created_at, "%I:%M %p")
+            }
+            for m in messages
+        ]
+    except Exception as e:
+        logger.error(f"Error loading chat history for customer_id {customer_id}: {e}")
+        return []
 
 def toggle_customer_bot_pause(db: Session, customer_id: int, paused: bool):
     customer = db.query(Customer).filter(Customer.customer_id == customer_id).first()

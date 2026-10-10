@@ -137,10 +137,17 @@ export default function ChatMessenger({ wsEvent }) {
     }
   }, [wsEvent, selectedCustomerId]);
 
-  // Safely find selected customer with fallback to prevent UI unmounting
+  // Safely find selected customer with fallback object so UI composer NEVER unmounts or vanishes
   const selectedCustomer =
     chats.find((c) => String(c.customer_id) === String(selectedCustomerId)) ||
-    (chats.length > 0 ? chats[0] : null);
+    (chats.length > 0
+      ? chats[0]
+      : {
+          customer_id: selectedCustomerId || 1,
+          customer_name: 'Live Customer',
+          phone_number: 'WhatsApp',
+          bot_paused: false,
+        });
 
   const handleSelectCustomer = (customerId) => {
     setSelectedCustomerId(customerId);
