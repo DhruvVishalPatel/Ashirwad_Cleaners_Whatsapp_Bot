@@ -1102,11 +1102,11 @@ body {
 
 /* Standalone Split-Screen Workspace */
 .chat-standalone-workspace {
-  flex: 1;
+  flex: 1 1 0%;
+  min-height: 0;
   display: grid;
   grid-template-columns: 300px minmax(0, 1fr);
-  height: calc(100vh - 60px);
-  min-height: 0;
+  width: 100%;
   overflow: hidden;
   background: var(--bg-primary);
 }
