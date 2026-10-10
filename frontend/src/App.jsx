@@ -213,8 +213,9 @@ export default function App() {
     return <LoginScreen onLoginSuccess={() => setIsAuthenticated(true)} />;
   }
 
-  // RENDER STANDALONE FULL-SCREEN CHAT PAGE WHEN ON /chat
-  if (pathname === '/chat') {
+  // RENDER STANDALONE FULL-SCREEN CHAT PAGE WHEN ON /chat or /chat/
+  const isChatRoute = pathname === '/chat' || pathname === '/chat/' || pathname.startsWith('/chat/');
+  if (isChatRoute) {
     return (
       <StandaloneChatPage
         wsEvent={lastWsEvent}

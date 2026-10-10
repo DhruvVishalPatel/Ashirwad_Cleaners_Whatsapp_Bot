@@ -169,15 +169,15 @@ async def admin_redirect():
     return RedirectResponse(url="/")
 
 @app.get("/chat")
+@app.get("/chat/")
+@app.get("/chat/{full_path:path}")
 async def chat_spa_page():
     if os.path.exists("frontend/dist/index.html"):
-        return FileResponse("frontend/dist/index.html")
-    return RedirectResponse(url="/")
-
-@app.get("/chat/{full_path:path}")
-async def chat_spa_subpath_page(full_path: str):
-    if os.path.exists("frontend/dist/index.html"):
-        return FileResponse("frontend/dist/index.html")
+        response = FileResponse("frontend/dist/index.html")
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+        return response
     return RedirectResponse(url="/")
 
 # Mount built frontend at bottom so explicit API & Webhook routes take precedence
