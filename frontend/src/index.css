@@ -705,6 +705,10 @@ body {
   display: flex;
   flex-direction: column;
   background: var(--bg-primary);
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .chat-header {
@@ -791,7 +795,8 @@ body {
 
 /* Chat Feed */
 .chat-messages-feed {
-  flex: 1;
+  flex: 1 1 0%;
+  min-height: 0;
   padding: 1.25rem;
   overflow-y: auto;
   display: flex;
@@ -906,6 +911,7 @@ body {
   align-items: center;
   gap: 0.6rem;
   overflow-x: auto;
+  flex-shrink: 0;
 }
 
 .quick-replies-label {
@@ -940,11 +946,12 @@ body {
 
 /* Message Composer */
 .chat-composer {
-  padding: 0.85rem 1.25rem;
+  padding: 0.75rem 1.25rem;
   background: var(--bg-card);
   border-top: 1px solid var(--bg-card-border);
   display: flex;
   gap: 0.75rem;
+  flex-shrink: 0;
 }
 
 .composer-input {
@@ -1090,8 +1097,9 @@ body {
 .chat-standalone-workspace {
   flex: 1;
   display: grid;
-  grid-template-columns: 340px 1fr;
+  grid-template-columns: 300px minmax(0, 1fr);
   height: calc(100vh - 60px);
+  min-height: 0;
   overflow: hidden;
   background: var(--bg-primary);
 }
