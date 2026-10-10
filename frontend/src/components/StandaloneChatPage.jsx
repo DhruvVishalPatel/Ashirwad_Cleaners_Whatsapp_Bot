@@ -38,10 +38,12 @@ export default function StandaloneChatPage({ wsEvent, theme, toggleTheme, onLogo
   // Mobile responsive view toggle
   const [showMobileChat, setShowMobileChat] = useState(false);
 
-  const messagesEndRef = useRef(null);
+  const feedRef = useRef(null);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (feedRef.current) {
+      feedRef.current.scrollTop = feedRef.current.scrollHeight;
+    }
   };
 
   // Load chat threads
@@ -369,7 +371,7 @@ export default function StandaloneChatPage({ wsEvent, theme, toggleTheme, onLogo
               </div>
 
               {/* MESSAGES FEED */}
-              <div className="chat-messages-feed">
+              <div className="chat-messages-feed" ref={feedRef}>
                 {loadingMessages ? (
                   <div className="loading-state" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
                     <RefreshCw size={28} className="spin-icon" style={{ marginBottom: '0.8rem' }} />
@@ -413,7 +415,6 @@ export default function StandaloneChatPage({ wsEvent, theme, toggleTheme, onLogo
                     );
                   })
                 )}
-                <div ref={messagesEndRef} />
               </div>
 
               {/* QUICK REPLIES BAR */}
