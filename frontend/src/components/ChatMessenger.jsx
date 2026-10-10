@@ -29,6 +29,8 @@ export default function ChatMessenger({ wsEvent }) {
   const [togglingBot, setTogglingBot] = useState(false);
   const [chatError, setChatError] = useState(null);
   
+  const [refreshing, setRefreshing] = useState(false);
+  
   // Mobile navigation state
   const [showMobileChat, setShowMobileChat] = useState(false);
 
@@ -46,9 +48,17 @@ export default function ChatMessenger({ wsEvent }) {
     setChatError(null);
     try {
       const data = await api.getChats();
-      setChats(data || []);
-      if (!selectedCustomerId && data && data.length > 0) {
-        setSelectedCustomerId(data[0].customer_id);
+      const chatList = data || [];
+      setChats(chatList);
+      
+      if (chatList.length > 0) {
+        setSelectedCustomerId((prevId) => {
+          if (prevId !== null && prevId !== undefined) {
+            const exists = chatList.some((c) => String(c.customer_id) === String(prevId));
+            if (exists) return prevId;
+          }
+          return chatList[0].customer_id;
+        });
       }
     } catch (err) {
       console.error('Error loading chats:', err);
@@ -74,6 +84,21 @@ export default function ChatMessenger({ wsEvent }) {
     }
   };
 
+  // Explicit on-page refresh handler
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await loadChats(true);
+      if (selectedCustomerId) {
+        await loadMessages(selectedCustomerId, true);
+      }
+    } catch (e) {
+      console.error('Refresh error:', e);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   useEffect(() => {
     loadChats();
   }, []);
@@ -94,7 +119,7 @@ export default function ChatMessenger({ wsEvent }) {
     if (wsEvent.type === 'CHAT_MESSAGE_RECEIVED' || wsEvent.event === 'CHAT_MESSAGE_RECEIVED') {
       const payload = wsEvent.data;
       loadChats(true);
-      if (selectedCustomerId && payload.customer_id === selectedCustomerId) {
+      if (selectedCustomerId && String(payload.customer_id) === String(selectedCustomerId)) {
         setMessages((prev) => {
           if (prev.some((m) => m.id === payload.id)) return prev;
           return [...prev, payload];
@@ -104,7 +129,7 @@ export default function ChatMessenger({ wsEvent }) {
       const payload = wsEvent.data;
       setChats((prev) =>
         prev.map((c) =>
-          c.customer_id === payload.customer_id
+          String(c.customer_id) === String(payload.customer_id)
             ? { ...c, bot_paused: payload.bot_paused }
             : c
         )
@@ -112,7 +137,10 @@ export default function ChatMessenger({ wsEvent }) {
     }
   }, [wsEvent, selectedCustomerId]);
 
-  const selectedCustomer = chats.find((c) => c.customer_id === selectedCustomerId);
+  // Safely find selected customer with fallback to prevent UI unmounting
+  const selectedCustomer =
+    chats.find((c) => String(c.customer_id) === String(selectedCustomerId)) ||
+    (chats.length > 0 ? chats[0] : null);
 
   const handleSelectCustomer = (customerId) => {
     setSelectedCustomerId(customerId);
@@ -182,11 +210,12 @@ export default function ChatMessenger({ wsEvent }) {
             </h2>
             <button
               className="btn btn-secondary btn-icon"
-              onClick={() => loadChats()}
-              title="Refresh Chats"
+              onClick={handleRefresh}
+              title="Refresh Chats & Messages"
+              disabled={refreshing}
               style={{ padding: '0.35rem 0.5rem' }}
             >
-              <RefreshCw size={14} />
+              <RefreshCw size={14} className={refreshing ? 'spin-icon' : ''} />
             </button>
           </div>
           <div className="search-input-wrapper">
