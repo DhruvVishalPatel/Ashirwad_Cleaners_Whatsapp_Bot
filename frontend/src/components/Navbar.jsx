@@ -1,5 +1,5 @@
 import React from 'react';
-import { RefreshCw, LogOut, Moon, Sun, Radio } from 'lucide-react';
+import { RefreshCw, LogOut, Moon, Sun, Radio, MessageSquare } from 'lucide-react';
 
 export default function Navbar({ onRefresh, onLogout, theme, toggleTheme, wsConnected }) {
   return (
@@ -27,6 +27,17 @@ export default function Navbar({ onRefresh, onLogout, theme, toggleTheme, wsConn
           <Radio size={14} className={wsConnected ? 'pulse-icon' : ''} />
           {wsConnected ? 'Live Real-Time' : 'Connecting...'}
         </div>
+
+        <a
+          href="/chat"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="btn btn-primary btn-sm"
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', textDecoration: 'none' }}
+          title="Open Live Chat Messenger in a new tab"
+        >
+          <MessageSquare size={15} /> 💬 Open Live Chat
+        </a>
 
         <button className="btn btn-secondary btn-sm" onClick={onRefresh} title="Refresh Data">
           <RefreshCw size={15} /> Sync Data

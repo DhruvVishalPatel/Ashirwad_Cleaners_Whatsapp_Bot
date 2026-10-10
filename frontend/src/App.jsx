@@ -5,10 +5,10 @@ import OrderManagement from './components/OrderManagement';
 import CustomerDirectory from './components/CustomerDirectory';
 import StaffManager from './components/StaffManager';
 import CatalogManager from './components/CatalogManager';
-import ChatMessenger from './components/ChatMessenger';
+import StandaloneChatPage from './components/StandaloneChatPage';
 import LoginScreen from './components/LoginScreen';
 import { api, getAuthToken, setAuthToken } from './api';
-import { ShoppingBag, Users, Truck, Tag, Bell, MessageSquare } from 'lucide-react';
+import { ShoppingBag, Users, Truck, Tag, Bell, MessageSquare, ExternalLink } from 'lucide-react';
 
 function playNewOrderChime() {
   try {
@@ -32,21 +32,8 @@ function playNewOrderChime() {
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'dark');
-  const [activeTab, setActiveTab] = useState(
-    window.location.pathname === '/chat' ? 'chat' : 'orders'
-  );
-
-  // Sync route with tab selection
-  const handleTabChange = (tab) => {
-    setActiveTab(tab);
-    if (tab === 'chat') {
-      window.history.pushState(null, '', '/chat');
-    } else {
-      if (window.location.pathname === '/chat') {
-        window.history.pushState(null, '', '/');
-      }
-    }
-  };
+  const [pathname, setPathname] = useState(window.location.pathname);
+  const [activeTab, setActiveTab] = useState('orders');
 
   // Real-time WebSocket State
   const [wsConnected, setWsConnected] = useState(false);
@@ -75,11 +62,7 @@ export default function App() {
   // Handle browser back/forward buttons
   useEffect(() => {
     const handlePopState = () => {
-      if (window.location.pathname === '/chat') {
-        setActiveTab('chat');
-      } else {
-        setActiveTab('orders');
-      }
+      setPathname(window.location.pathname);
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
@@ -116,10 +99,10 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && pathname !== '/chat') {
       fetchAllData();
     }
-  }, [isAuthenticated, fetchAllData]);
+  }, [isAuthenticated, pathname, fetchAllData]);
 
   // WebSocket Real-time Connection
   useEffect(() => {
@@ -160,13 +143,13 @@ export default function App() {
               title: '🎉 NEW ORDER RECEIVED!',
               body: `Order #${msg.data.order_id} (${msg.data.item_count} items - ${msg.data.service_category || 'Dry Clean'})`,
             });
-            fetchAllData();
+            if (pathname !== '/chat') fetchAllData();
           } else if (msg.type === 'ORDER_UPDATED') {
             setToastNotification({
               title: '🔄 ORDER UPDATED',
               body: `Order #${msg.data.order_id} state updated.`,
             });
-            fetchAllData();
+            if (pathname !== '/chat') fetchAllData();
           } else if (msg.type === 'CHAT_MESSAGE_RECEIVED') {
             if (msg.data.sender_type === 'CUSTOMER') {
               playNewOrderChime();
@@ -201,7 +184,7 @@ export default function App() {
       }
       clearInterval(pingInterval);
     };
-  }, [isAuthenticated, fetchAllData]);
+  }, [isAuthenticated, pathname, fetchAllData]);
 
   // Toast notification timer
   useEffect(() => {
@@ -230,6 +213,20 @@ export default function App() {
     return <LoginScreen onLoginSuccess={() => setIsAuthenticated(true)} />;
   }
 
+  // RENDER STANDALONE FULL-SCREEN CHAT PAGE WHEN ON /chat
+  if (pathname === '/chat') {
+    return (
+      <StandaloneChatPage
+        wsEvent={lastWsEvent}
+        theme={theme}
+        toggleTheme={toggleTheme}
+        onLogout={handleLogout}
+        wsConnected={wsConnected}
+      />
+    );
+  }
+
+  // RENDER STANDARD ADMIN DASHBOARD
   return (
     <div className="app-container" style={{ position: 'relative' }}>
       {/* Toast Notification Banner */}
@@ -269,81 +266,79 @@ export default function App() {
 
       {/* Main Tabs Header */}
       <div className="tabs-header">
-        <button
-          className={`tab-btn ${activeTab === 'chat' ? 'active' : ''}`}
-          onClick={() => handleTabChange('chat')}
+        <a
+          href="/chat"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="tab-btn btn-chat-tab"
+          style={{ textDecoration: 'none' }}
         >
-          <MessageSquare size={18} /> 💬 Live Chats
-        </button>
+          <MessageSquare size={18} /> 💬 Open Live Chat <ExternalLink size={14} style={{ marginLeft: '0.2rem', opacity: 0.7 }} />
+        </a>
 
         <button
           className={`tab-btn ${activeTab === 'orders' ? 'active' : ''}`}
-          onClick={() => handleTabChange('orders')}
+          onClick={() => setActiveTab('orders')}
         >
           <ShoppingBag size={18} /> 📋 Active Orders
         </button>
 
         <button
           className={`tab-btn ${activeTab === 'customers' ? 'active' : ''}`}
-          onClick={() => handleTabChange('customers')}
+          onClick={() => setActiveTab('customers')}
         >
           <Users size={18} /> 👥 Customer Database
         </button>
 
         <button
           className={`tab-btn ${activeTab === 'runners' ? 'active' : ''}`}
-          onClick={() => handleTabChange('runners')}
+          onClick={() => setActiveTab('runners')}
         >
           <Truck size={18} /> 🛵 Staff Settings
         </button>
 
         <button
           className={`tab-btn ${activeTab === 'catalog' ? 'active' : ''}`}
-          onClick={() => handleTabChange('catalog')}
+          onClick={() => setActiveTab('catalog')}
         >
           <Tag size={18} /> 🏷️ Price Catalog Manager
         </button>
       </div>
 
       {/* Tab Content */}
-      {activeTab === 'chat' && (
-        <ChatMessenger wsEvent={lastWsEvent} />
-      )}
+      <div className="glass-card" style={{ minHeight: '500px' }}>
+        {activeTab === 'orders' && (
+          <OrderManagement
+            orders={orders}
+            runners={runners}
+            catalog={catalog}
+            onRefresh={(showAll) => fetchAllData(showAll)}
+          />
+        )}
 
-      {activeTab !== 'chat' && (
-        <div className="glass-card" style={{ minHeight: '500px' }}>
-          {activeTab === 'orders' && (
-            <OrderManagement
-              orders={orders}
-              runners={runners}
-              catalog={catalog}
-              onRefresh={(showAll) => fetchAllData(showAll)}
-            />
-          )}
+        {activeTab === 'customers' && (
+          <CustomerDirectory
+            customers={customers}
+            onRefresh={() => fetchAllData()}
+          />
+        )}
 
-          {activeTab === 'customers' && (
-            <CustomerDirectory
-              customers={customers}
-              onRefresh={() => fetchAllData()}
-            />
-          )}
+        {activeTab === 'runners' && (
+          <StaffManager
+            runners={runners}
+            onRefresh={() => fetchAllData()}
+          />
+        )}
 
-          {activeTab === 'runners' && (
-            <StaffManager
-              runners={runners}
-              onRefresh={() => fetchAllData()}
-            />
-          )}
-
-          {activeTab === 'catalog' && (
-            <CatalogManager
-              catalog={catalog}
-              onRefresh={() => fetchAllData()}
-            />
-          )}
-        </div>
-      )}
+        {activeTab === 'catalog' && (
+          <CatalogManager
+            catalog={catalog}
+            onRefresh={() => fetchAllData()}
+          />
+        )}
+      </div>
     </div>
   );
 }
+
 
