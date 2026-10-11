@@ -55,6 +55,7 @@ export const api = {
 
   // Analytics
   getAnalytics: () => request('/orders/analytics'),
+  getDetailedAnalytics: (timeframe = 'weekly') => request(`/orders/analytics/detailed?timeframe=${encodeURIComponent(timeframe)}`),
 
   // Orders
   getOrders: (showAll = false) => request(`/orders?show_all=${showAll}`),

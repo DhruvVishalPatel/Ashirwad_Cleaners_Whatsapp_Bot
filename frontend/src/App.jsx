@@ -5,10 +5,11 @@ import OrderManagement from './components/OrderManagement';
 import CustomerDirectory from './components/CustomerDirectory';
 import StaffManager from './components/StaffManager';
 import CatalogManager from './components/CatalogManager';
+import AnalyticsView from './components/AnalyticsView';
 import StandaloneChatPage from './components/StandaloneChatPage';
 import LoginScreen from './components/LoginScreen';
 import { api, getAuthToken, setAuthToken } from './api';
-import { ShoppingBag, Users, Truck, Tag, Bell, MessageSquare, ExternalLink } from 'lucide-react';
+import { ShoppingBag, Users, Truck, Tag, Bell, MessageSquare, ExternalLink, BarChart3 } from 'lucide-react';
 
 function playNewOrderChime() {
   try {
@@ -295,6 +296,13 @@ export default function App() {
         </button>
 
         <button
+          className={`tab-btn ${activeTab === 'analytics' ? 'active' : ''}`}
+          onClick={() => setActiveTab('analytics')}
+        >
+          <BarChart3 size={18} /> 📊 Business Analytics
+        </button>
+
+        <button
           className={`tab-btn ${activeTab === 'customers' ? 'active' : ''}`}
           onClick={() => setActiveTab('customers')}
         >
@@ -326,6 +334,10 @@ export default function App() {
             catalog={catalog}
             onRefresh={(showAll) => fetchAllData(showAll)}
           />
+        )}
+
+        {activeTab === 'analytics' && (
+          <AnalyticsView wsEvent={lastWsEvent} />
         )}
 
         {activeTab === 'customers' && (

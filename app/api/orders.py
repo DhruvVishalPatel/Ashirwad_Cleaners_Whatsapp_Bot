@@ -1,7 +1,9 @@
 from typing import List, Optional
+from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 
 from app.core.database import SessionLocal
 from app.models.schemas import (
@@ -59,6 +61,263 @@ def get_analytics(db: Session = Depends(get_db)):
         "active_orders": active_orders_count,
         "pending_pickups": pending_pickups,
         "total_customers": total_customers
+    }
+
+@router.get("/analytics/detailed")
+def get_detailed_analytics(
+    timeframe: str = Query("weekly", description="Timeframe filter: daily, weekly, monthly, quarterly, annual, all"),
+    db: Session = Depends(get_db)
+):
+    current_time = now_ist()
+    timeframe = (timeframe or "weekly").lower()
+
+    if timeframe == "daily":
+        start_date = current_time.replace(hour=0, minute=0, second=0, microsecond=0)
+        period_label = "Today"
+    elif timeframe == "weekly":
+        start_date = (current_time - timedelta(days=7)).replace(hour=0, minute=0, second=0, microsecond=0)
+        period_label = "Last 7 Days"
+    elif timeframe == "monthly":
+        start_date = (current_time - timedelta(days=30)).replace(hour=0, minute=0, second=0, microsecond=0)
+        period_label = "Last 30 Days"
+    elif timeframe == "quarterly":
+        start_date = (current_time - timedelta(days=90)).replace(hour=0, minute=0, second=0, microsecond=0)
+        period_label = "Last 90 Days"
+    elif timeframe == "annual":
+        start_date = (current_time - timedelta(days=365)).replace(hour=0, minute=0, second=0, microsecond=0)
+        period_label = "Last 365 Days"
+    else:
+        timeframe = "all"
+        start_date = None
+        period_label = "All Time"
+
+    query = db.query(Order)
+    if start_date:
+        query = query.filter(Order.created_at >= start_date)
+    orders = query.all()
+
+    total_orders = len(orders)
+    total_revenue = 0.0
+    paid_revenue = 0.0
+    pending_revenue = 0.0
+    delivery_fees = 0.0
+    points_redeemed = 0
+    total_garments = 0
+
+    order_ids = [o.order_id for o in orders]
+
+    pickup_orders_count = 0
+    pickup_revenue = 0.0
+    store_drop_orders_count = 0
+    store_drop_revenue = 0.0
+
+    payment_modes = {"UPI": 0, "CASH": 0, "PENDING": 0}
+    payment_statuses = {"PAID": 0, "PENDING": 0}
+
+    status_counts = {
+        "PENDING_PICKUP": 0,
+        "IN_SHOP": 0,
+        "PROCESSING": 0,
+        "READY": 0,
+        "DELIVERED": 0,
+        "CANCELLED": 0,
+        "REJECTED": 0
+    }
+
+    customer_spend_map = {}
+
+    for o in orders:
+        amt = o.total_amount if o.total_amount is not None else (o.estimated_amount or 0.0)
+        fee = o.delivery_fee or 0.0
+        pts = o.points_redeemed or 0
+        effective_total = max(0.0, amt + fee - pts)
+
+        total_revenue += effective_total
+        delivery_fees += fee
+        points_redeemed += pts
+        total_garments += (o.item_count or 0)
+
+        # Status counts
+        status_key = o.status.name if hasattr(o.status, "name") else str(o.status)
+        status_counts[status_key] = status_counts.get(status_key, 0) + 1
+
+        # Channel
+        is_store_drop = False
+        if hasattr(o, "order_type") and o.order_type:
+            otype_str = o.order_type.name if hasattr(o.order_type, "name") else str(o.order_type)
+            if otype_str == "STORE_DROP":
+                is_store_drop = True
+
+        if is_store_drop:
+            store_drop_orders_count += 1
+            store_drop_revenue += effective_total
+        else:
+            pickup_orders_count += 1
+            pickup_revenue += effective_total
+
+        # Payment status
+        p_status_key = o.payment_status.name if hasattr(o.payment_status, "name") else str(o.payment_status or "PENDING")
+        if p_status_key == "PAID":
+            paid_revenue += effective_total
+            payment_statuses["PAID"] += 1
+        else:
+            pending_revenue += effective_total
+            payment_statuses["PENDING"] += 1
+
+        # Payment mode
+        p_mode_key = o.payment_mode.name if (hasattr(o, "payment_mode") and o.payment_mode and hasattr(o.payment_mode, "name")) else (str(o.payment_mode) if o.payment_mode else None)
+        if p_mode_key == "UPI":
+            payment_modes["UPI"] += 1
+        elif p_mode_key == "CASH":
+            payment_modes["CASH"] += 1
+        else:
+            payment_modes["PENDING"] += 1
+
+        # Customer aggregation
+        if o.customer:
+            cid = o.customer_id
+            cname = o.customer.name or f"Customer #{cid}"
+            cphone = o.customer.phone_number
+            if cid not in customer_spend_map:
+                customer_spend_map[cid] = {"id": cid, "name": cname, "phone": cphone, "orders": 0, "spend": 0.0}
+            customer_spend_map[cid]["orders"] += 1
+            customer_spend_map[cid]["spend"] += effective_total
+
+    # Services & Garments breakdown
+    services_counts = {}
+    garment_counts = {}
+
+    if order_ids:
+        items = db.query(OrderItem).filter(OrderItem.order_id.in_(order_ids)).all()
+        for it in items:
+            s_name = (it.service_type or "Dry Clean").replace("_", " ").title()
+            g_name = (it.garment_type or "Garment").title()
+            qty = it.quantity or 1
+            services_counts[s_name] = services_counts.get(s_name, 0) + qty
+            garment_counts[g_name] = garment_counts.get(g_name, 0) + qty
+
+    # Customer Demographics
+    total_customers_db = db.query(Customer).count()
+    repeat_customers = db.query(Customer).filter(Customer.order_count >= 2).count()
+    languages_query = db.query(Customer.preferred_language, func.count(Customer.customer_id)).group_by(Customer.preferred_language).all()
+    language_breakdown = {}
+    for lang, count in languages_query:
+        language_breakdown[lang or "ENGLISH"] = count
+
+    # Top customers list sorted by spend
+    top_customers = sorted(customer_spend_map.values(), key=lambda x: (x["spend"], x["orders"]), reverse=True)[:5]
+
+    # Timeline trends based on timeframe
+    trends = []
+    if timeframe == "daily":
+        time_buckets = [
+            ("09:00 - 11:00", 9, 11),
+            ("11:00 - 13:00", 11, 13),
+            ("13:00 - 15:00", 13, 15),
+            ("15:00 - 17:00", 15, 17),
+            ("17:00 - 19:00", 17, 19),
+            ("19:00 - 21:00", 19, 21),
+        ]
+        for label, h_start, h_end in time_buckets:
+            b_orders = [o for o in orders if o.created_at and h_start <= o.created_at.hour < h_end]
+            b_rev = sum([
+                max(0.0, (o.total_amount if o.total_amount is not None else (o.estimated_amount or 0.0)) + (o.delivery_fee or 0.0) - (o.points_redeemed or 0))
+                for o in b_orders
+            ])
+            trends.append({"label": label, "orders": len(b_orders), "revenue": round(b_rev, 2)})
+
+    elif timeframe == "weekly":
+        for i in range(6, -1, -1):
+            d = (current_time - timedelta(days=i))
+            d_start = d.replace(hour=0, minute=0, second=0, microsecond=0)
+            d_end = d.replace(hour=23, minute=59, second=59, microsecond=999999)
+            d_orders = [o for o in orders if o.created_at and d_start <= o.created_at <= d_end]
+            d_rev = sum([
+                max(0.0, (o.total_amount if o.total_amount is not None else (o.estimated_amount or 0.0)) + (o.delivery_fee or 0.0) - (o.points_redeemed or 0))
+                for o in d_orders
+            ])
+            trends.append({
+                "label": d.strftime("%a (%d %b)"),
+                "orders": len(d_orders),
+                "revenue": round(d_rev, 2)
+            })
+
+    elif timeframe == "monthly":
+        for i in range(3, -1, -1):
+            w_start_days = (i + 1) * 7
+            w_end_days = i * 7
+            w_start = (current_time - timedelta(days=w_start_days)).replace(hour=0, minute=0, second=0, microsecond=0)
+            w_end = (current_time - timedelta(days=w_end_days)).replace(hour=23, minute=59, second=59, microsecond=999999)
+            w_orders = [o for o in orders if o.created_at and w_start <= o.created_at <= w_end]
+            w_rev = sum([
+                max(0.0, (o.total_amount if o.total_amount is not None else (o.estimated_amount or 0.0)) + (o.delivery_fee or 0.0) - (o.points_redeemed or 0))
+                for o in w_orders
+            ])
+            lbl = f"Week {4 - i}" if i > 0 else "Current Week"
+            trends.append({
+                "label": f"{lbl} ({w_start.strftime('%d %b')} - {w_end.strftime('%d %b')})",
+                "orders": len(w_orders),
+                "revenue": round(w_rev, 2)
+            })
+
+    elif timeframe in ["quarterly", "annual", "all"]:
+        num_months = 3 if timeframe == "quarterly" else (12 if timeframe == "annual" else 6)
+        for i in range(num_months - 1, -1, -1):
+            target_date = current_time - timedelta(days=i * 30)
+            y, m = target_date.year, target_date.month
+            m_orders = [o for o in orders if o.created_at and o.created_at.year == y and o.created_at.month == m]
+            m_rev = sum([
+                max(0.0, (o.total_amount if o.total_amount is not None else (o.estimated_amount or 0.0)) + (o.delivery_fee or 0.0) - (o.points_redeemed or 0))
+                for o in m_orders
+            ])
+            trends.append({
+                "label": target_date.strftime("%b %Y"),
+                "orders": len(m_orders),
+                "revenue": round(m_rev, 2)
+            })
+
+    avg_order_val = (total_revenue / total_orders) if total_orders > 0 else 0.0
+
+    return {
+        "timeframe": timeframe,
+        "period_label": period_label,
+        "kpis": {
+            "total_revenue": round(total_revenue, 2),
+            "paid_revenue": round(paid_revenue, 2),
+            "pending_revenue": round(pending_revenue, 2),
+            "total_orders": total_orders,
+            "total_garments": total_garments,
+            "avg_order_value": round(avg_order_val, 2),
+            "delivery_fees_collected": round(delivery_fees, 2),
+            "points_redeemed": points_redeemed
+        },
+        "channels": {
+            "pickup": {
+                "orders": pickup_orders_count,
+                "revenue": round(pickup_revenue, 2),
+                "share_pct": round((pickup_orders_count / total_orders * 100), 1) if total_orders > 0 else 0
+            },
+            "store_drop": {
+                "orders": store_drop_orders_count,
+                "revenue": round(store_drop_revenue, 2),
+                "share_pct": round((store_drop_orders_count / total_orders * 100), 1) if total_orders > 0 else 0
+            }
+        },
+        "payments": {
+            "modes": payment_modes,
+            "statuses": payment_statuses
+        },
+        "funnel": status_counts,
+        "services": services_counts,
+        "top_garments": sorted([{"name": k, "count": v} for k, v in garment_counts.items()], key=lambda x: x["count"], reverse=True)[:8],
+        "customers": {
+            "total_registered": total_customers_db,
+            "repeat_customers": repeat_customers,
+            "repeat_rate_pct": round((repeat_customers / total_customers_db * 100), 1) if total_customers_db > 0 else 0,
+            "languages": language_breakdown,
+            "top_customers": top_customers
+        },
+        "trends": trends
     }
 
 def serialize_order(o: Order) -> dict:
