@@ -125,8 +125,22 @@ def get_detailed_analytics(
     }
 
     customer_spend_map = {}
+    valid_orders_count = 0
+    cancelled_orders_count = 0
+    valid_order_ids = []
 
     for o in orders:
+        status_key = o.status.name if hasattr(o.status, "name") else str(o.status)
+        status_counts[status_key] = status_counts.get(status_key, 0) + 1
+
+        # CRITICAL: Exclude cancelled & rejected orders from revenue, unpaid section, channels & garments!
+        if status_key in ["CANCELLED", "REJECTED"]:
+            cancelled_orders_count += 1
+            continue
+
+        valid_orders_count += 1
+        valid_order_ids.append(o.order_id)
+
         amt = o.total_amount if o.total_amount is not None else (o.estimated_amount or 0.0)
         fee = o.delivery_fee or 0.0
         pts = o.points_redeemed or 0
@@ -136,10 +150,6 @@ def get_detailed_analytics(
         delivery_fees += fee
         points_redeemed += pts
         total_garments += (o.item_count or 0)
-
-        # Status counts
-        status_key = o.status.name if hasattr(o.status, "name") else str(o.status)
-        status_counts[status_key] = status_counts.get(status_key, 0) + 1
 
         # Channel
         is_store_drop = False
@@ -155,7 +165,7 @@ def get_detailed_analytics(
             pickup_orders_count += 1
             pickup_revenue += effective_total
 
-        # Payment status
+        # Payment status (Only active/completed orders count as PAID or PENDING unpaid receivables)
         p_status_key = o.payment_status.name if hasattr(o.payment_status, "name") else str(o.payment_status or "PENDING")
         if p_status_key == "PAID":
             paid_revenue += effective_total
@@ -183,12 +193,12 @@ def get_detailed_analytics(
             customer_spend_map[cid]["orders"] += 1
             customer_spend_map[cid]["spend"] += effective_total
 
-    # Services & Garments breakdown
+    # Services & Garments breakdown (only for valid non-cancelled orders)
     services_counts = {}
     garment_counts = {}
 
-    if order_ids:
-        items = db.query(OrderItem).filter(OrderItem.order_id.in_(order_ids)).all()
+    if valid_order_ids:
+        items = db.query(OrderItem).filter(OrderItem.order_id.in_(valid_order_ids)).all()
         for it in items:
             s_name = (it.service_type or "Dry Clean").replace("_", " ").title()
             g_name = (it.garment_type or "Garment").title()
@@ -207,7 +217,12 @@ def get_detailed_analytics(
     # Top customers list sorted by spend
     top_customers = sorted(customer_spend_map.values(), key=lambda x: (x["spend"], x["orders"]), reverse=True)[:5]
 
-    # Timeline trends based on timeframe
+    # Helper for filtering out cancelled orders from trend buckets
+    def is_valid_order(ord_obj):
+        st = ord_obj.status.name if hasattr(ord_obj.status, "name") else str(ord_obj.status)
+        return st not in ["CANCELLED", "REJECTED"]
+
+    # Timeline trends based on timeframe (only non-cancelled orders count)
     trends = []
     if timeframe == "daily":
         time_buckets = [
@@ -219,7 +234,7 @@ def get_detailed_analytics(
             ("19:00 - 21:00", 19, 21),
         ]
         for label, h_start, h_end in time_buckets:
-            b_orders = [o for o in orders if o.created_at and h_start <= o.created_at.hour < h_end]
+            b_orders = [o for o in orders if o.created_at and h_start <= o.created_at.hour < h_end and is_valid_order(o)]
             b_rev = sum([
                 max(0.0, (o.total_amount if o.total_amount is not None else (o.estimated_amount or 0.0)) + (o.delivery_fee or 0.0) - (o.points_redeemed or 0))
                 for o in b_orders
@@ -231,7 +246,7 @@ def get_detailed_analytics(
             d = (current_time - timedelta(days=i))
             d_start = d.replace(hour=0, minute=0, second=0, microsecond=0)
             d_end = d.replace(hour=23, minute=59, second=59, microsecond=999999)
-            d_orders = [o for o in orders if o.created_at and d_start <= o.created_at <= d_end]
+            d_orders = [o for o in orders if o.created_at and d_start <= o.created_at <= d_end and is_valid_order(o)]
             d_rev = sum([
                 max(0.0, (o.total_amount if o.total_amount is not None else (o.estimated_amount or 0.0)) + (o.delivery_fee or 0.0) - (o.points_redeemed or 0))
                 for o in d_orders
@@ -248,7 +263,7 @@ def get_detailed_analytics(
             w_end_days = i * 7
             w_start = (current_time - timedelta(days=w_start_days)).replace(hour=0, minute=0, second=0, microsecond=0)
             w_end = (current_time - timedelta(days=w_end_days)).replace(hour=23, minute=59, second=59, microsecond=999999)
-            w_orders = [o for o in orders if o.created_at and w_start <= o.created_at <= w_end]
+            w_orders = [o for o in orders if o.created_at and w_start <= o.created_at <= w_end and is_valid_order(o)]
             w_rev = sum([
                 max(0.0, (o.total_amount if o.total_amount is not None else (o.estimated_amount or 0.0)) + (o.delivery_fee or 0.0) - (o.points_redeemed or 0))
                 for o in w_orders
@@ -265,7 +280,7 @@ def get_detailed_analytics(
         for i in range(num_months - 1, -1, -1):
             target_date = current_time - timedelta(days=i * 30)
             y, m = target_date.year, target_date.month
-            m_orders = [o for o in orders if o.created_at and o.created_at.year == y and o.created_at.month == m]
+            m_orders = [o for o in orders if o.created_at and o.created_at.year == y and o.created_at.month == m and is_valid_order(o)]
             m_rev = sum([
                 max(0.0, (o.total_amount if o.total_amount is not None else (o.estimated_amount or 0.0)) + (o.delivery_fee or 0.0) - (o.points_redeemed or 0))
                 for o in m_orders
@@ -276,7 +291,7 @@ def get_detailed_analytics(
                 "revenue": round(m_rev, 2)
             })
 
-    avg_order_val = (total_revenue / total_orders) if total_orders > 0 else 0.0
+    avg_order_val = (total_revenue / valid_orders_count) if valid_orders_count > 0 else 0.0
 
     return {
         "timeframe": timeframe,
@@ -285,7 +300,8 @@ def get_detailed_analytics(
             "total_revenue": round(total_revenue, 2),
             "paid_revenue": round(paid_revenue, 2),
             "pending_revenue": round(pending_revenue, 2),
-            "total_orders": total_orders,
+            "total_orders": valid_orders_count,
+            "cancelled_orders": cancelled_orders_count,
             "total_garments": total_garments,
             "avg_order_value": round(avg_order_val, 2),
             "delivery_fees_collected": round(delivery_fees, 2),
@@ -295,12 +311,12 @@ def get_detailed_analytics(
             "pickup": {
                 "orders": pickup_orders_count,
                 "revenue": round(pickup_revenue, 2),
-                "share_pct": round((pickup_orders_count / total_orders * 100), 1) if total_orders > 0 else 0
+                "share_pct": round((pickup_orders_count / valid_orders_count * 100), 1) if valid_orders_count > 0 else 0
             },
             "store_drop": {
                 "orders": store_drop_orders_count,
                 "revenue": round(store_drop_revenue, 2),
-                "share_pct": round((store_drop_orders_count / total_orders * 100), 1) if total_orders > 0 else 0
+                "share_pct": round((store_drop_orders_count / valid_orders_count * 100), 1) if valid_orders_count > 0 else 0
             }
         },
         "payments": {
