@@ -241,12 +241,19 @@ export default function CreateOrderModal({
   return createPortal(
     <div className="modal-overlay" onClick={onClose} style={{ zIndex: 9999 }}>
       <div
-        className="modal-container create-order-modal"
+        className="modal-content create-order-modal"
         onClick={(e) => e.stopPropagation()}
-        style={{ maxWidth: '850px', width: '95%', maxHeight: '92vh', overflowY: 'auto' }}
+        style={{
+          background: 'var(--bg-secondary)',
+          backgroundColor: 'var(--bg-secondary)',
+          maxWidth: '850px',
+          width: '95%',
+          maxHeight: '92vh',
+          overflowY: 'auto'
+        }}
       >
         {/* Header */}
-        <div className="modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
           <div>
             <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <Receipt size={22} className="text-primary" /> Create New Order (Digital POS)
@@ -255,22 +262,22 @@ export default function CreateOrderModal({
               Book counter walk-ins or home pickup/delivery orders directly into the system.
             </div>
           </div>
-          <button className="btn-close" onClick={onClose}>
+          <button className="modal-close" onClick={onClose} title="Close Modal">
             <X size={20} />
           </button>
         </div>
 
         {errorMsg && (
-          <div className="alert-banner alert-error" style={{ margin: '1rem 1.25rem 0' }}>
+          <div className="alert-banner alert-error" style={{ marginBottom: '1rem' }}>
             <AlertCircle size={18} />
             <span>{errorMsg}</span>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           
           {/* SECTION 1: CUSTOMER SELECTION */}
-          <div className="pos-card" style={{ background: 'var(--bg-secondary)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--bg-card-border)' }}>
+          <div className="pos-card" style={{ background: 'var(--bg-primary)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--bg-card-border)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
               <label style={{ fontSize: '0.88rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.4rem', margin: 0 }}>
                 <User size={16} className="text-primary" /> Customer Information
@@ -645,7 +652,7 @@ export default function CreateOrderModal({
             </div>
 
             {/* Right: Payment Status & Bill Box */}
-            <div style={{ background: 'var(--bg-secondary)', padding: '0.85rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--bg-card-border)' }}>
+            <div style={{ background: 'var(--bg-primary)', padding: '0.85rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--bg-card-border)' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginBottom: '0.75rem' }}>
                 <div>
                   <label style={{ fontSize: '0.76rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.2rem' }}>

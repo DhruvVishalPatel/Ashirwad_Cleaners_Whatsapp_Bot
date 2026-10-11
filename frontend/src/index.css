@@ -378,6 +378,20 @@ body {
   animation: modalFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+.create-order-modal {
+  background: var(--bg-secondary) !important;
+  background-color: var(--bg-secondary) !important;
+  color: var(--text-primary);
+  border: 1px solid var(--bg-card-border) !important;
+  box-shadow: 0 25px 60px -12px rgba(0, 0, 0, 0.75) !important;
+}
+
+.pos-card {
+  background: var(--bg-primary) !important;
+  border: 1px solid var(--bg-card-border);
+  border-radius: var(--radius-md);
+}
+
 @keyframes modalFadeIn {
   from {
     opacity: 0;

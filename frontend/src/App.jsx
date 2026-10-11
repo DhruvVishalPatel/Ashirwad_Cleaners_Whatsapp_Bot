@@ -269,16 +269,6 @@ export default function App() {
 
       {/* Main Tabs Header */}
       <div className="tabs-header">
-        <a
-          href="/chat"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="tab-btn btn-chat-tab"
-          style={{ textDecoration: 'none' }}
-        >
-          <MessageSquare size={18} /> 💬 Open Live Chat <ExternalLink size={14} style={{ marginLeft: '0.2rem', opacity: 0.7 }} />
-        </a>
-
         <button
           className={`tab-btn ${activeTab === 'orders' ? 'active' : ''}`}
           onClick={() => setActiveTab('orders')}
