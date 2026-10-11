@@ -7,13 +7,29 @@ import CreateOrderModal from './CreateOrderModal';
 
 const STATUS_HUMAN_MAP = {
   PENDING_PICKUP: 'Pending Pickup',
-  PICKED_UP: 'Picked Up',
-  IN_SHOP: 'Received at Shop',
+  IN_SHOP: 'Received at Store',
   PROCESSING: 'In Cleaning',
   READY: 'Ready for Delivery',
   DELIVERED: 'Delivered',
   CANCELLED: 'Cancelled',
   REJECTED: 'Rejected',
+};
+
+const STORE_DROP_STATUS_HUMAN_MAP = {
+  IN_SHOP: 'InStore',
+  PROCESSING: 'In Cleaning',
+  READY: 'Ready for Pick Up',
+  DELIVERED: 'Picked Up',
+  CANCELLED: 'Cancelled',
+  REJECTED: 'Rejected',
+};
+
+const getStatusLabel = (order) => {
+  if (!order) return '';
+  if (order.order_type === 'STORE_DROP') {
+    return STORE_DROP_STATUS_HUMAN_MAP[order.status] || order.status;
+  }
+  return STATUS_HUMAN_MAP[order.status] || order.status;
 };
 
 const PAYMENT_HUMAN_MAP = {
@@ -83,7 +99,7 @@ export default function OrderManagement({ orders, runners, catalog, customers = 
     );
     setRawPriceInput(order.total_amount !== null ? order.total_amount : order.estimated_amount || 0);
     setPaymentStatusInput(order.payment_status || 'PENDING');
-    setOrderStatusInput(order.status || 'PENDING_PICKUP');
+    setOrderStatusInput(order.status || (order.order_type === 'STORE_DROP' ? 'IN_SHOP' : 'PENDING_PICKUP'));
     setSelectedRunnerPhone(runners.length > 0 ? runners[0].phone_number : '');
     setModalMessage({ type: '', text: '' });
     setShowDeliveryConfirmModal(false);
@@ -372,7 +388,7 @@ export default function OrderManagement({ orders, runners, catalog, customers = 
                   </td>
                   <td>
                     <span className={`badge ${getBadgeClass(o.status)}`}>
-                      {STATUS_HUMAN_MAP[o.status] || o.status}
+                      {getStatusLabel(o)}
                     </span>
                   </td>
                   <td>
@@ -417,7 +433,7 @@ export default function OrderManagement({ orders, runners, catalog, customers = 
             {/* Read-Only Terminal State Banner */}
             {isTerminalState && (
               <div className="alert-banner alert-success" style={{ background: 'rgba(16,185,129,0.1)', borderColor: 'rgba(16,185,129,0.3)', color: '#34d399' }}>
-                <Lock size={16} /> <strong>Order Lifecycle Completed ({STATUS_HUMAN_MAP[selectedOrder.status]}):</strong> Garments, prices, and address details are permanently locked to preserve historical record integrity.
+                <Lock size={16} /> <strong>Order Lifecycle Completed ({getStatusLabel(selectedOrder)}):</strong> Garments, prices, and address details are permanently locked to preserve historical record integrity.
               </div>
             )}
 
@@ -585,12 +601,22 @@ export default function OrderManagement({ orders, runners, catalog, customers = 
                     disabled={isTerminalState}
                     onChange={(e) => setOrderStatusInput(e.target.value)}
                   >
-                    <option value="PENDING_PICKUP">Pending Pickup</option>
-                    <option value="PICKED_UP">Picked Up</option>
-                    <option value="IN_SHOP">Received at Shop</option>
-                    <option value="PROCESSING">In Cleaning</option>
-                    <option value="READY">Ready for Delivery</option>
-                    <option value="DELIVERED">Delivered</option>
+                    {selectedOrder?.order_type === 'STORE_DROP' ? (
+                      <>
+                        <option value="IN_SHOP">InStore</option>
+                        <option value="PROCESSING">In Cleaning</option>
+                        <option value="READY">Ready for Pick Up</option>
+                        <option value="DELIVERED">Picked Up</option>
+                      </>
+                    ) : (
+                      <>
+                        <option value="PENDING_PICKUP">Pending Pickup</option>
+                        <option value="IN_SHOP">Received at Store</option>
+                        <option value="PROCESSING">In Cleaning</option>
+                        <option value="READY">Ready for Delivery</option>
+                        <option value="DELIVERED">Delivered</option>
+                      </>
+                    )}
                   </select>
                 </div>
                 {!isTerminalState && (
@@ -665,7 +691,7 @@ export default function OrderManagement({ orders, runners, catalog, customers = 
 
             <div style={{ marginBottom: '1.25rem', fontSize: '0.92rem', lineHeight: '1.5' }}>
               <p style={{ marginBottom: '0.75rem', fontWeight: 600 }}>
-                Are you sure you want to mark Order #{selectedOrder.order_id} as <span style={{ color: 'var(--accent-success)' }}>DELIVERED</span>?
+                Are you sure you want to mark Order #{selectedOrder.order_id} as <span style={{ color: 'var(--accent-success)' }}>{selectedOrder.order_type === 'STORE_DROP' ? 'PICKED UP' : 'DELIVERED'}</span>?
               </p>
               
               <div className="glass-card" style={{ padding: '0.85rem 1rem', marginBottom: '1rem', background: 'var(--bg-secondary)', fontSize: '0.85rem' }}>
@@ -676,7 +702,7 @@ export default function OrderManagement({ orders, runners, catalog, customers = 
               </div>
 
               <div className="alert-banner alert-error" style={{ fontSize: '0.82rem', marginBottom: 0 }}>
-                ⚠️ <strong>Important Notice:</strong> Confirming delivery will lock this order permanently, credit customer loyalty points, and send the final delivery receipt message on WhatsApp.
+                ⚠️ <strong>Important Notice:</strong> Confirming {selectedOrder.order_type === 'STORE_DROP' ? 'pickup' : 'delivery'} will lock this order permanently, credit customer loyalty points, and send the final receipt message on WhatsApp.
               </div>
             </div>
 
@@ -693,7 +719,7 @@ export default function OrderManagement({ orders, runners, catalog, customers = 
                 onClick={executeStatusUpdate}
                 disabled={isSaving}
               >
-                {isSaving ? 'Processing...' : '✅ Confirm & Deliver Order'}
+                {isSaving ? 'Processing...' : (selectedOrder.order_type === 'STORE_DROP' ? '✅ Confirm & Mark Picked Up' : '✅ Confirm & Deliver Order')}
               </button>
             </div>
           </div>
