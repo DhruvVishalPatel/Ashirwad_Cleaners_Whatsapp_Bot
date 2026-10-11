@@ -142,13 +142,13 @@ function GarmentCombobox({
             alignItems: 'center',
             background: 'var(--bg-secondary)'
           }}>
-            <span>All Catalog Garments ({filteredList.length})</span>
+            <span>Available Garments ({filteredList.length})</span>
             <span>Est. Rate</span>
           </div>
 
           {filteredList.length === 0 ? (
             <div style={{ padding: '0.75rem', textAlign: 'center', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-              <div>No exact match in catalog.</div>
+              <div>No match in this service.</div>
               {query.trim() && (
                 <button
                   type="button"
@@ -245,9 +245,9 @@ export default function CreateOrderModal({
   const [flatAddress, setFlatAddress] = useState('');
   const [specialInstructions, setSpecialInstructions] = useState('');
   
-  // Items Breakdown
+  // Initial 1 item
   const [items, setItems] = useState([
-    { garment_type: 'Shirt', service_type: 'Dry Clean', quantity: 1, price: 80, special_notes: '' }
+    { garment_type: 'Shirt', service_type: 'Dry Clean', quantity: 1, price: 50, special_notes: '' }
   ]);
 
   // Payment & Bot Takeover State
@@ -306,46 +306,66 @@ export default function CreateOrderModal({
     }
   }, [catalog]);
 
-  // All unique garment names across the entire catalog sorted alphabetically
-  const uniqueGarmentList = useMemo(() => {
-    const namesSet = new Set();
-    (internalCatalog || []).forEach((ci) => {
-      const nm = (ci.item_name || '').trim();
-      if (nm) namesSet.add(nm);
-    });
+  const normalizeServiceKey = (st) => {
+    if (!st) return 'dry_clean';
+    const lower = st.toLowerCase().trim();
+    if (lower.includes('dry')) return 'dry_clean';
+    if (lower.includes('wash') && !lower.includes('petrol')) return 'washing';
+    if (lower.includes('press') || lower.includes('steam')) return 'steam_press';
+    if (lower.includes('petrol') || lower.includes('stain')) return 'petrol_wash';
+    return lower.replace(/ & /g, '_').replace(/ /g, '_');
+  };
 
-    if (namesSet.size === 0) {
-      [
-        'Shirt', 'Pant', 'T-Shirt', 'Kurta', 'Saree', 'Blouse', 'Suit',
-        'Coat', 'Jacket', 'Blanket (Single Bed)', 'Blanket (Double Bed)',
-        'Curtain', 'Double Bedsheet', 'Single Bedsheet', 'Dupatta',
-        'Sherwani', 'Chaniya', 'Salwar', 'Payjama', 'Woolen Coat'
-      ].forEach((g) => namesSet.add(g));
+  // Strictly returns ONLY the garments served under the specific service type
+  const getGarmentsWithPricesForService = (serviceTypeLabel) => {
+    const sKey = normalizeServiceKey(serviceTypeLabel);
+    const filtered = (internalCatalog || []).filter(
+      (ci) => normalizeServiceKey(ci.service_type) === sKey
+    );
+
+    if (filtered.length > 0) {
+      return filtered
+        .map((ci) => ({
+          item_name: ci.item_name,
+          price: ci.price,
+          is_variable: ci.is_variable,
+          note: ci.note
+        }))
+        .sort((a, b) => a.item_name.localeCompare(b.item_name));
     }
 
-    return Array.from(namesSet).sort((a, b) => a.localeCompare(b));
-  }, [internalCatalog]);
-
-  // Builds the full list of garments with service-adjusted prices
-  const getGarmentsWithPricesForService = (serviceTypeLabel) => {
-    const sType = (serviceTypeLabel || '').toLowerCase().replace(/ & /g, '_').replace(/ /g, '_');
-    return uniqueGarmentList.map((gName) => {
-      const match = (internalCatalog || []).find(
-        (ci) =>
-          ci.item_name.toLowerCase() === gName.toLowerCase() &&
-          (ci.service_type || '').toLowerCase().includes(sType)
-      );
-
-      const anyMatch = (internalCatalog || []).find(
-        (ci) => ci.item_name.toLowerCase() === gName.toLowerCase()
-      );
-
-      return {
-        item_name: gName,
-        price: match ? match.price : (anyMatch ? anyMatch.price : 60),
-        inService: !!match
-      };
-    });
+    // Safe fallbacks per service type if catalog is still loading
+    if (sKey === 'washing') {
+      return [
+        { item_name: 'Kurta', price: 35 },
+        { item_name: 'Pant', price: 35 },
+        { item_name: 'Payjama', price: 35 },
+        { item_name: 'Shirt', price: 35 },
+        { item_name: 'T-Shirt', price: 35 },
+        { item_name: 'Top', price: 80 }
+      ];
+    }
+    if (sKey === 'steam_press') {
+      return [
+        { item_name: 'Blouse', price: 20 },
+        { item_name: 'Coat / Blazer', price: 80 },
+        { item_name: 'Kurta', price: 20 },
+        { item_name: 'Pant', price: 20 },
+        { item_name: 'Payjama', price: 20 },
+        { item_name: 'Saree', price: 80 },
+        { item_name: 'Shirt', price: 20 },
+        { item_name: 'T-Shirt', price: 20 },
+        { item_name: 'Woolen Coat', price: 80 }
+      ];
+    }
+    return [
+      { item_name: 'Kurta', price: 50 },
+      { item_name: 'Pant', price: 50 },
+      { item_name: 'Payjama', price: 50 },
+      { item_name: 'Saree', price: 200 },
+      { item_name: 'Shirt', price: 50 },
+      { item_name: 'T-Shirt', price: 50 }
+    ];
   };
 
   // Garment rows helpers
@@ -354,23 +374,27 @@ export default function CreateOrderModal({
       const updated = [...prev];
       const row = { ...updated[index], [field]: value };
 
-      // Auto-price if garment or service changes
-      if (field === 'garment_type' || field === 'service_type') {
-        const sType = (row.service_type || '').toLowerCase().replace(/ & /g, '_').replace(/ /g, '_');
-        const match = (internalCatalog || []).find(
-          (ci) =>
-            ci.item_name.toLowerCase() === (row.garment_type || '').toLowerCase() &&
-            (ci.service_type || '').toLowerCase().includes(sType)
+      // Auto-price and garment realignment if service_type changes
+      if (field === 'service_type') {
+        const availableGarments = getGarmentsWithPricesForService(value);
+        const match = availableGarments.find(
+          (ci) => ci.item_name.toLowerCase() === (row.garment_type || '').toLowerCase()
+        );
+
+        if (match) {
+          row.price = match.price;
+        } else if (availableGarments.length > 0) {
+          // Garment is not served under this new service: auto-switch to first available garment
+          row.garment_type = availableGarments[0].item_name;
+          row.price = availableGarments[0].price;
+        }
+      } else if (field === 'garment_type') {
+        const availableGarments = getGarmentsWithPricesForService(row.service_type);
+        const match = availableGarments.find(
+          (ci) => ci.item_name.toLowerCase() === (value || '').toLowerCase()
         );
         if (match) {
           row.price = match.price;
-        } else {
-          const anyMatch = (internalCatalog || []).find(
-            (ci) => ci.item_name.toLowerCase() === (row.garment_type || '').toLowerCase()
-          );
-          if (anyMatch) {
-            row.price = anyMatch.price;
-          }
         }
       }
 
@@ -379,9 +403,30 @@ export default function CreateOrderModal({
     });
   };
 
+  const handleDefaultServiceChange = (newService) => {
+    setServiceCategory(newService);
+    // If only 1 initial item exists, align its service and garment with the chosen default service
+    if (items.length === 1) {
+      const availableGarments = getGarmentsWithPricesForService(newService);
+      const match = availableGarments.find(
+        (ci) => ci.item_name.toLowerCase() === (items[0].garment_type || '').toLowerCase()
+      );
+      const chosenItem = match || (availableGarments.length > 0 ? availableGarments[0] : { item_name: 'Shirt', price: 50 });
+      setItems([
+        {
+          garment_type: chosenItem.item_name,
+          service_type: newService,
+          quantity: items[0].quantity || 1,
+          price: chosenItem.price,
+          special_notes: items[0].special_notes || ''
+        }
+      ]);
+    }
+  };
+
   const handleAddItem = () => {
     const garments = getGarmentsWithPricesForService(serviceCategory);
-    const defaultItem = garments.length > 0 ? garments[0] : { item_name: 'Shirt', price: 80 };
+    const defaultItem = garments.length > 0 ? garments[0] : { item_name: 'Shirt', price: 50 };
 
     setItems((prev) => [
       ...prev,
@@ -741,7 +786,7 @@ export default function CreateOrderModal({
                   className="form-control form-control-sm"
                   style={{ width: '160px', padding: '0.3rem 0.5rem', fontSize: '0.8rem' }}
                   value={serviceCategory}
-                  onChange={(e) => setServiceCategory(e.target.value)}
+                  onChange={(e) => handleDefaultServiceChange(e.target.value)}
                 >
                   {SERVICE_TYPES.map((st) => (
                     <option key={st.id} value={st.id}>{st.label}</option>

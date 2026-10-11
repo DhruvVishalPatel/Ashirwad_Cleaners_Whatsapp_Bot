@@ -32,10 +32,6 @@ def clear_test_data():
 
         # Check and ensure catalog items are preserved
         catalog_count = db.query(CatalogItem).count()
-        if catalog_count == 0:
-            print("Catalog table was empty. Re-seeding from price_list.json...")
-            init_db()
-            catalog_count = db.query(CatalogItem).count()
 
         print("✅ DATABASE CLEANUP SUMMARY:")
         print(f"   • Order Items Deleted:        {items_deleted}")
