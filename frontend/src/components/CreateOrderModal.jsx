@@ -756,12 +756,12 @@ export default function CreateOrderModal({
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.84rem' }}>
                 <thead>
                   <tr style={{ background: 'var(--bg-secondary)', borderBottom: '1px solid var(--bg-card-border)', textAlign: 'left' }}>
-                    <th style={{ padding: '0.6rem 0.75rem', width: '25%' }}>Service Type</th>
-                    <th style={{ padding: '0.6rem 0.75rem', width: '30%' }}>Garment Name</th>
-                    <th style={{ padding: '0.6rem 0.75rem', width: '15%' }}>Qty</th>
-                    <th style={{ padding: '0.6rem 0.75rem', width: '15%' }}>Price (₹)</th>
+                    <th style={{ padding: '0.6rem 0.75rem', width: '20%' }}>Service Type</th>
+                    <th style={{ padding: '0.6rem 0.75rem', width: '45%' }}>Garment Name</th>
+                    <th style={{ padding: '0.6rem 0.4rem', width: '8%', textAlign: 'center' }}>Qty</th>
+                    <th style={{ padding: '0.6rem 0.75rem', width: '13%' }}>Price (₹)</th>
                     <th style={{ padding: '0.6rem 0.75rem', width: '10%' }}>Total</th>
-                    <th style={{ padding: '0.6rem 0.5rem', width: '5%', textAlign: 'center' }}></th>
+                    <th style={{ padding: '0.6rem 0.5rem', width: '4%', textAlign: 'center' }}></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -797,11 +797,12 @@ export default function CreateOrderModal({
                           />
                         </td>
 
-                        <td style={{ padding: '0.5rem 0.75rem' }}>
+                        <td style={{ padding: '0.5rem 0.4rem', textAlign: 'center' }}>
                           <input
                             type="number"
                             min="1"
                             className="form-control form-control-sm"
+                            style={{ textAlign: 'center', padding: '0.3rem 0.2rem' }}
                             value={row.quantity}
                             onChange={(e) => handleItemChange(idx, 'quantity', Math.max(1, parseInt(e.target.value) || 1))}
                             required
