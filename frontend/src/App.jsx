@@ -104,6 +104,11 @@ export default function App() {
     }
   }, [isAuthenticated, pathname, fetchAllData]);
 
+  const pathnameRef = useRef(pathname);
+  useEffect(() => {
+    pathnameRef.current = pathname;
+  }, [pathname]);
+
   // WebSocket Real-time Connection
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -117,12 +122,19 @@ export default function App() {
 
     let socket;
     let pingInterval;
+    let reconnectTimer;
+    let isMounted = true;
 
     const connectWebSocket = () => {
+      if (!isMounted) return;
       socket = new WebSocket(wsUrl);
       wsRef.current = socket;
 
       socket.onopen = () => {
+        if (!isMounted) {
+          socket.close();
+          return;
+        }
         setWsConnected(true);
         pingInterval = setInterval(() => {
           if (socket.readyState === WebSocket.OPEN) {
@@ -132,6 +144,7 @@ export default function App() {
       };
 
       socket.onmessage = (event) => {
+        if (!isMounted) return;
         try {
           if (event.data === 'pong') return;
           const msg = JSON.parse(event.data);
@@ -143,13 +156,13 @@ export default function App() {
               title: '🎉 NEW ORDER RECEIVED!',
               body: `Order #${msg.data.order_id} (${msg.data.item_count} items - ${msg.data.service_category || 'Dry Clean'})`,
             });
-            if (pathname !== '/chat') fetchAllData();
+            if (pathnameRef.current !== '/chat') fetchAllData();
           } else if (msg.type === 'ORDER_UPDATED') {
             setToastNotification({
               title: '🔄 ORDER UPDATED',
               body: `Order #${msg.data.order_id} state updated.`,
             });
-            if (pathname !== '/chat') fetchAllData();
+            if (pathnameRef.current !== '/chat') fetchAllData();
           } else if (msg.type === 'CHAT_MESSAGE_RECEIVED') {
             if (msg.data.sender_type === 'CUSTOMER') {
               playNewOrderChime();
@@ -167,24 +180,29 @@ export default function App() {
       socket.onclose = () => {
         setWsConnected(false);
         clearInterval(pingInterval);
-        // Auto-reconnect after 3 seconds
-        setTimeout(connectWebSocket, 3000);
+        if (isMounted) {
+          reconnectTimer = setTimeout(connectWebSocket, 3000);
+        }
       };
 
       socket.onerror = () => {
-        socket.close();
+        if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) {
+          socket.close();
+        }
       };
     };
 
     connectWebSocket();
 
     return () => {
+      isMounted = false;
+      clearTimeout(reconnectTimer);
+      clearInterval(pingInterval);
       if (wsRef.current) {
         wsRef.current.close();
       }
-      clearInterval(pingInterval);
     };
-  }, [isAuthenticated, pathname, fetchAllData]);
+  }, [isAuthenticated, fetchAllData]);
 
   // Toast notification timer
   useEffect(() => {

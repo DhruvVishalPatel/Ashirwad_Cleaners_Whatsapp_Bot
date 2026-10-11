@@ -10,6 +10,7 @@ from app.models.schemas import (
 )
 from app.services.crud import get_monthly_order_count, add_points_transaction, now_ist, clean_order_id, get_runners
 from app.services.whatsapp_sender import send_text_message
+from app.core.logger import logger
 
 router = APIRouter(prefix="/orders", tags=["Orders"])
 
@@ -547,7 +548,7 @@ def create_counter_order(req: CreateCounterOrderRequest, db: Session = Depends(g
                 payment_status=req.payment_status
             )
         except Exception as e:
-            pass
+            logger.error(f"Failed to send WhatsApp confirmation receipt for order #{order_id}: {e}")
 
     # 10. Broadcast real-time WebSocket event
     try:
@@ -557,8 +558,8 @@ def create_counter_order(req: CreateCounterOrderRequest, db: Session = Depends(g
             "item_count": total_qty,
             "service_category": req.service_category
         })
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"Failed to broadcast ORDER_CREATED event for order #{order_id}: {e}")
 
     db.refresh(db_order)
     return serialize_order(db_order)

@@ -1,6 +1,7 @@
 import os
 import requests
 import json
+from app.core.logger import logger
 
 WA_PHONE_NUMBER_ID = os.environ.get("WA_PHONE_NUMBER_ID")
 WA_ACCESS_TOKEN = os.environ.get("WA_ACCESS_TOKEN")
@@ -43,8 +44,14 @@ def send_text_message(to_number: str, text: str, sender_type: str = "BOT"):
         "type": "text",
         "text": {"preview_url": False, "body": text}
     }
-    response = requests.post(url, headers=headers, json=payload)
-    return response.json()
+    try:
+        response = requests.post(url, headers=headers, json=payload, timeout=10)
+        if response.status_code >= 400:
+            logger.error(f"WhatsApp send_text error [{response.status_code}]: {response.text}")
+        return response.json()
+    except Exception as e:
+        logger.error(f"WhatsApp send_text request failed for {to_number}: {e}")
+        return {"error": str(e)}
 
 def send_interactive_buttons(to_number: str, body_text: str, buttons: list, sender_type: str = "BOT"):
     btn_titles = ", ".join([f"[{b.get('title')}]" for b in buttons])
@@ -82,8 +89,14 @@ def send_interactive_buttons(to_number: str, body_text: str, buttons: list, send
             "action": {"buttons": interactive_buttons}
         }
     }
-    response = requests.post(url, headers=headers, json=payload)
-    return response.json()
+    try:
+        response = requests.post(url, headers=headers, json=payload, timeout=10)
+        if response.status_code >= 400:
+            logger.error(f"WhatsApp send_interactive_buttons error [{response.status_code}]: {response.text}")
+        return response.json()
+    except Exception as e:
+        logger.error(f"WhatsApp send_interactive_buttons request failed for {to_number}: {e}")
+        return {"error": str(e)}
 
 def send_image_message(to_number: str, image_url: str, caption: str = None, sender_type: str = "BOT"):
     content = caption or "[Image Message]"
@@ -110,8 +123,14 @@ def send_image_message(to_number: str, image_url: str, caption: str = None, send
     if caption:
         payload["image"]["caption"] = caption
         
-    response = requests.post(url, headers=headers, json=payload)
-    return response.json()
+    try:
+        response = requests.post(url, headers=headers, json=payload, timeout=10)
+        if response.status_code >= 400:
+            logger.error(f"WhatsApp send_image error [{response.status_code}]: {response.text}")
+        return response.json()
+    except Exception as e:
+        logger.error(f"WhatsApp send_image request failed for {to_number}: {e}")
+        return {"error": str(e)}
 
 def send_order_receipt_whatsapp(
     phone_number: str,
