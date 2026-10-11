@@ -7,17 +7,37 @@ WA_PHONE_NUMBER_ID = os.environ.get("WA_PHONE_NUMBER_ID")
 WA_ACCESS_TOKEN = os.environ.get("WA_ACCESS_TOKEN")
 GRAPH_API_VERSION = "v19.0"
 
+def format_whatsapp_number(phone: str) -> str:
+    """
+    Normalizes any input phone number into Meta WhatsApp Cloud API format (E.164 without '+').
+    For Indian numbers: exactly 12 digits starting with '91' (e.g. 919876543210).
+    Handles 10-digit inputs, leading '0', '+91', spaces, and dashes.
+    """
+    if not phone:
+        return ""
+    digits = "".join(filter(str.isdigit, str(phone)))
+    if len(digits) == 10:
+        return f"91{digits}"
+    if len(digits) == 11 and digits.startswith("0"):
+        return f"91{digits[1:]}"
+    if len(digits) == 12 and digits.startswith("91"):
+        return digits
+    if len(digits) > 10:
+        return f"91{digits[-10:]}"
+    return digits
+
 def _auto_log_outbound(to_number: str, content: str, sender_type: str = "BOT", message_type: str = "text", media_url: str = None):
     try:
         from app.core.database import SessionLocal
         from app.services.crud import get_customer, log_chat_message
+        norm_number = format_whatsapp_number(to_number)
         with SessionLocal() as db:
-            customer = get_customer(db, to_number)
+            customer = get_customer(db, norm_number)
             if customer:
                 log_chat_message(
                     db,
                     customer_id=customer.customer_id,
-                    phone_number=to_number,
+                    phone_number=norm_number,
                     sender_type=sender_type,
                     content=content,
                     message_type=message_type,
@@ -27,6 +47,7 @@ def _auto_log_outbound(to_number: str, content: str, sender_type: str = "BOT", m
         pass
 
 def send_text_message(to_number: str, text: str, sender_type: str = "BOT"):
+    to_number = format_whatsapp_number(to_number)
     _auto_log_outbound(to_number, text, sender_type=sender_type, message_type="text")
     if not WA_ACCESS_TOKEN:
         print(f"MOCK WA SEND [TEXT] to {to_number}: {text}")
@@ -54,6 +75,7 @@ def send_text_message(to_number: str, text: str, sender_type: str = "BOT"):
         return {"error": str(e)}
 
 def send_interactive_buttons(to_number: str, body_text: str, buttons: list, sender_type: str = "BOT"):
+    to_number = format_whatsapp_number(to_number)
     btn_titles = ", ".join([f"[{b.get('title')}]" for b in buttons])
     full_content = f"{body_text}\n{btn_titles}" if btn_titles else body_text
     _auto_log_outbound(to_number, full_content, sender_type=sender_type, message_type="interactive")
@@ -99,6 +121,7 @@ def send_interactive_buttons(to_number: str, body_text: str, buttons: list, send
         return {"error": str(e)}
 
 def send_image_message(to_number: str, image_url: str, caption: str = None, sender_type: str = "BOT"):
+    to_number = format_whatsapp_number(to_number)
     content = caption or "[Image Message]"
     _auto_log_outbound(to_number, content, sender_type=sender_type, message_type="image", media_url=image_url)
 

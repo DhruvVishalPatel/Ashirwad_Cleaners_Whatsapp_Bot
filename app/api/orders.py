@@ -704,19 +704,25 @@ def create_counter_order(req: CreateCounterOrderRequest, db: Session = Depends(g
             customer.saved_address = req.flat_address
             db.commit()
     elif resolved_phone:
-        clean_phone = "".join(filter(str.isdigit, resolved_phone))
-        if not clean_phone or len(clean_phone) < 10:
+        from app.services.whatsapp_sender import format_whatsapp_number
+        clean_phone = format_whatsapp_number(resolved_phone)
+        if not clean_phone or len(clean_phone) < 12:
             raise HTTPException(status_code=400, detail="Invalid phone number for new customer")
         
-        customer = db.query(Customer).filter(Customer.phone_number.like(f"%{clean_phone[-10:]}%")).first()
+        customer = db.query(Customer).filter(
+            (Customer.phone_number == clean_phone) |
+            (Customer.phone_number.like(f"%{clean_phone[-10:]}%"))
+        ).first()
         if not customer:
             customer = create_customer(
                 db,
-                phone_number=clean_phone if clean_phone.startswith("91") else f"91{clean_phone}",
+                phone_number=clean_phone,
                 name=resolved_name or "Walk-in Customer",
                 saved_address=resolved_address
             )
         else:
+            if customer.phone_number != clean_phone:
+                customer.phone_number = clean_phone
             if resolved_name and (not customer.name or customer.name.startswith("Customer")):
                 customer.name = resolved_name
             if resolved_address and not customer.saved_address:
@@ -811,8 +817,10 @@ def create_counter_order(req: CreateCounterOrderRequest, db: Session = Depends(g
                 }
                 for it in req.items
             ]
-            send_order_receipt_whatsapp(
-                phone_number=customer.phone_number,
+            from app.services.whatsapp_sender import format_whatsapp_number
+            target_phone = format_whatsapp_number(customer.phone_number)
+            send_res = send_order_receipt_whatsapp(
+                phone_number=target_phone,
                 order_id=order_id,
                 customer_name=customer.name,
                 order_type=req.order_type,
@@ -822,6 +830,7 @@ def create_counter_order(req: CreateCounterOrderRequest, db: Session = Depends(g
                 points_redeemed=req.points_redeemed,
                 payment_status=req.payment_status
             )
+            logger.info(f"WhatsApp order receipt send result for #{order_id} to {target_phone}: {send_res}")
         except Exception as e:
             logger.error(f"Failed to send WhatsApp confirmation receipt for order #{order_id}: {e}")
 

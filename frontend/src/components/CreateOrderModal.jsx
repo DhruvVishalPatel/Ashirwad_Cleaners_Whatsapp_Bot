@@ -470,11 +470,14 @@ export default function CreateOrderModal({
       setErrorMsg('Please select an existing customer or switch to "Add New Customer".');
       return;
     }
+    let formattedPhone = null;
     if (isNewCustomer) {
-      if (!newCustPhone.trim() || newCustPhone.replace(/\D/g, '').length < 10) {
+      const rawDigits = newCustPhone.replace(/\D/g, '');
+      if (!rawDigits || rawDigits.length < 10) {
         setErrorMsg('Please enter a valid 10-digit mobile number for the new customer.');
         return;
       }
+      formattedPhone = rawDigits.length === 10 ? `91${rawDigits}` : (rawDigits.startsWith('91') && rawDigits.length === 12 ? rawDigits : `91${rawDigits.slice(-10)}`);
     }
     if (orderType === 'PICKUP' && !flatAddress.trim()) {
       setErrorMsg('Pickup & Delivery orders require a home address for runner dispatch.');
@@ -490,7 +493,7 @@ export default function CreateOrderModal({
       const payload = {
         customer_id: isNewCustomer ? null : Number(selectedCustomerId),
         new_customer_name: isNewCustomer ? newCustName.trim() : null,
-        new_customer_phone: isNewCustomer ? newCustPhone.trim() : null,
+        new_customer_phone: formattedPhone,
         new_customer_address: isNewCustomer ? newCustAddress.trim() : null,
         order_type: orderType, // 'STORE_DROP' or 'PICKUP'
         service_category: serviceCategory,

@@ -5,11 +5,19 @@ from app.models.schemas import Customer, Order, OrderItem, Runner, PointTransact
 
 
 def get_customer(db: Session, phone_number: str):
-    return db.query(Customer).filter(Customer.phone_number == phone_number).first()
+    from app.services.whatsapp_sender import format_whatsapp_number
+    clean = format_whatsapp_number(phone_number)
+    return db.query(Customer).filter(
+        (Customer.phone_number == phone_number) |
+        (Customer.phone_number == clean) |
+        (Customer.phone_number.like(f"%{clean[-10:]}%"))
+    ).first()
 
 def create_customer(db: Session, phone_number: str, name: str = None, preferred_language: str = "ENGLISH", saved_address: str = None):
+    from app.services.whatsapp_sender import format_whatsapp_number
+    clean = format_whatsapp_number(phone_number)
     db_customer = Customer(
-        phone_number=phone_number, 
+        phone_number=clean, 
         name=name, 
         preferred_language=preferred_language or "ENGLISH",
         saved_address=saved_address
