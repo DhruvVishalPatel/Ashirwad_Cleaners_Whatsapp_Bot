@@ -25,8 +25,7 @@ const SERVICE_TYPES = [
   { id: 'Dry Clean', label: 'Dry Clean 👔', catKey: 'dry_clean' },
   { id: 'Washing', label: 'Washing & Ironing 🧺', catKey: 'washing' },
   { id: 'Steam Press', label: 'Steam Press 💨', catKey: 'steam_press' },
-  { id: 'Petrol Wash', label: 'Petrol Wash ⛽', catKey: 'petrol_wash' },
-  { id: 'Shoe Wash', label: 'Shoe Wash 👟', catKey: 'shoe_wash' }
+  { id: 'Petrol Wash', label: 'Petrol Wash ⛽', catKey: 'petrol_wash' }
 ];
 
 function GarmentCombobox({
