@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import {
   X,
@@ -16,7 +16,8 @@ import {
   Sparkles,
   Search,
   DollarSign,
-  Send
+  Send,
+  ChevronDown
 } from 'lucide-react';
 import { api } from '../api';
 
@@ -27,6 +28,196 @@ const SERVICE_TYPES = [
   { id: 'Petrol Wash', label: 'Petrol Wash ⛽', catKey: 'petrol_wash' },
   { id: 'Shoe Wash', label: 'Shoe Wash 👟', catKey: 'shoe_wash' }
 ];
+
+function GarmentCombobox({
+  value,
+  onChange,
+  onSelectGarment,
+  garmentList = [],
+  placeholder = 'Type or select garment...'
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [query, setQuery] = useState(value || '');
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    setQuery(value || '');
+  }, [value]);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const filteredList = useMemo(() => {
+    if (!query.trim()) return garmentList;
+    const q = query.toLowerCase().trim();
+    return garmentList.filter((g) => g.item_name.toLowerCase().includes(q));
+  }, [garmentList, query]);
+
+  const handleSelect = (garmentName, price) => {
+    setQuery(garmentName);
+    onChange(garmentName);
+    if (onSelectGarment) {
+      onSelectGarment(garmentName, price);
+    }
+    setIsOpen(false);
+  };
+
+  return (
+    <div ref={containerRef} style={{ position: 'relative', width: '100%' }}>
+      <div style={{ display: 'flex', alignItems: 'center', position: 'relative' }}>
+        <input
+          type="text"
+          className="form-control form-control-sm"
+          style={{ width: '100%', paddingRight: '2.2rem', fontSize: '0.82rem' }}
+          placeholder={placeholder}
+          value={query}
+          onFocus={() => setIsOpen(true)}
+          onChange={(e) => {
+            const val = e.target.value;
+            setQuery(val);
+            onChange(val);
+            setIsOpen(true);
+          }}
+          required
+        />
+        <button
+          type="button"
+          tabIndex={-1}
+          onClick={() => setIsOpen((prev) => !prev)}
+          style={{
+            position: 'absolute',
+            right: '4px',
+            background: 'transparent',
+            border: 'none',
+            color: 'var(--text-muted)',
+            cursor: 'pointer',
+            padding: '4px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+          title="Browse all garments"
+        >
+          <ChevronDown
+            size={15}
+            style={{
+              transform: isOpen ? 'rotate(180deg)' : 'none',
+              transition: 'transform 0.2s ease',
+              color: isOpen ? 'var(--primary)' : 'var(--text-muted)'
+            }}
+          />
+        </button>
+      </div>
+
+      {isOpen && (
+        <div style={{
+          position: 'absolute',
+          top: 'calc(100% + 4px)',
+          left: 0,
+          right: 0,
+          zIndex: 99999,
+          background: 'var(--bg-card, #1e1e2d)',
+          border: '1px solid var(--border-color, rgba(255,255,255,0.15))',
+          borderRadius: 'var(--radius-md, 8px)',
+          boxShadow: '0 12px 30px rgba(0, 0, 0, 0.55)',
+          maxHeight: '240px',
+          overflowY: 'auto',
+          padding: '0.25rem 0'
+        }}>
+          <div style={{
+            padding: '0.35rem 0.75rem',
+            fontSize: '0.7rem',
+            fontWeight: 700,
+            color: 'var(--text-muted)',
+            textTransform: 'uppercase',
+            borderBottom: '1px solid var(--border-color)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            background: 'var(--bg-secondary)'
+          }}>
+            <span>All Catalog Garments ({filteredList.length})</span>
+            <span>Est. Rate</span>
+          </div>
+
+          {filteredList.length === 0 ? (
+            <div style={{ padding: '0.75rem', textAlign: 'center', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+              <div>No exact match in catalog.</div>
+              {query.trim() && (
+                <button
+                  type="button"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    handleSelect(query.trim(), null);
+                  }}
+                  style={{
+                    marginTop: '0.4rem',
+                    border: '1px dashed var(--primary)',
+                    background: 'rgba(99, 102, 241, 0.1)',
+                    color: 'var(--primary)',
+                    padding: '0.35rem 0.65rem',
+                    borderRadius: '4px',
+                    fontSize: '0.76rem',
+                    cursor: 'pointer',
+                    fontWeight: 600
+                  }}
+                >
+                  Use custom garment: "{query.trim()}"
+                </button>
+              )}
+            </div>
+          ) : (
+            filteredList.map((g, i) => (
+              <div
+                key={i}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  handleSelect(g.item_name, g.price);
+                }}
+                style={{
+                  padding: '0.45rem 0.75rem',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  fontSize: '0.82rem',
+                  cursor: 'pointer',
+                  borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
+                  transition: 'background 0.12s ease',
+                  background: query && query.toLowerCase() === g.item_name.toLowerCase() ? 'rgba(99, 102, 241, 0.18)' : 'transparent',
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(99, 102, 241, 0.2)'}
+                onMouseLeave={(e) => e.currentTarget.style.background = query && query.toLowerCase() === g.item_name.toLowerCase() ? 'rgba(99, 102, 241, 0.18)' : 'transparent'}
+              >
+                <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+                  {g.item_name}
+                </div>
+                {g.price != null && (
+                  <span style={{
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    color: '#34d399',
+                    background: 'rgba(16, 185, 129, 0.12)',
+                    padding: '2px 7px',
+                    borderRadius: '10px'
+                  }}>
+                    ₹{g.price}
+                  </span>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function CreateOrderModal({
   isOpen,
@@ -103,13 +294,58 @@ export default function CreateOrderModal({
     ).slice(0, 50);
   }, [customers, customerSearch]);
 
-  // Catalog item lookup helper
-  const getCatalogItemsForService = (serviceTypeLabel) => {
-    // Map serviceType label to catalog service_type
-    const sType = serviceTypeLabel.toLowerCase().replace(/ & /g, '_').replace(/ /g, '_');
-    return catalog.filter((ci) => {
-      const cst = (ci.service_type || '').toLowerCase();
-      return cst === sType || cst.includes(sType) || sType.includes(cst);
+  // Resilient catalog state (uses prop if available, fetches on mount if empty)
+  const [internalCatalog, setInternalCatalog] = useState(catalog || []);
+
+  useEffect(() => {
+    if (catalog && catalog.length > 0) {
+      setInternalCatalog(catalog);
+    } else {
+      api.getCatalog().then((data) => {
+        if (data && data.length > 0) setInternalCatalog(data);
+      }).catch(() => {});
+    }
+  }, [catalog]);
+
+  // All unique garment names across the entire catalog sorted alphabetically
+  const uniqueGarmentList = useMemo(() => {
+    const namesSet = new Set();
+    (internalCatalog || []).forEach((ci) => {
+      const nm = (ci.item_name || '').trim();
+      if (nm) namesSet.add(nm);
+    });
+
+    if (namesSet.size === 0) {
+      [
+        'Shirt', 'Pant', 'T-Shirt', 'Kurta', 'Saree', 'Blouse', 'Suit',
+        'Coat', 'Jacket', 'Blanket (Single Bed)', 'Blanket (Double Bed)',
+        'Curtain', 'Double Bedsheet', 'Single Bedsheet', 'Dupatta',
+        'Sherwani', 'Chaniya', 'Salwar', 'Payjama', 'Woolen Coat'
+      ].forEach((g) => namesSet.add(g));
+    }
+
+    return Array.from(namesSet).sort((a, b) => a.localeCompare(b));
+  }, [internalCatalog]);
+
+  // Builds the full list of garments with service-adjusted prices
+  const getGarmentsWithPricesForService = (serviceTypeLabel) => {
+    const sType = (serviceTypeLabel || '').toLowerCase().replace(/ & /g, '_').replace(/ /g, '_');
+    return uniqueGarmentList.map((gName) => {
+      const match = (internalCatalog || []).find(
+        (ci) =>
+          ci.item_name.toLowerCase() === gName.toLowerCase() &&
+          (ci.service_type || '').toLowerCase().includes(sType)
+      );
+
+      const anyMatch = (internalCatalog || []).find(
+        (ci) => ci.item_name.toLowerCase() === gName.toLowerCase()
+      );
+
+      return {
+        item_name: gName,
+        price: match ? match.price : (anyMatch ? anyMatch.price : 60),
+        inService: !!match
+      };
     });
   };
 
@@ -121,12 +357,21 @@ export default function CreateOrderModal({
 
       // Auto-price if garment or service changes
       if (field === 'garment_type' || field === 'service_type') {
-        const catItems = getCatalogItemsForService(row.service_type);
-        const match = catItems.find(
-          (ci) => ci.item_name.toLowerCase() === (row.garment_type || '').toLowerCase()
+        const sType = (row.service_type || '').toLowerCase().replace(/ & /g, '_').replace(/ /g, '_');
+        const match = (internalCatalog || []).find(
+          (ci) =>
+            ci.item_name.toLowerCase() === (row.garment_type || '').toLowerCase() &&
+            (ci.service_type || '').toLowerCase().includes(sType)
         );
         if (match) {
           row.price = match.price;
+        } else {
+          const anyMatch = (internalCatalog || []).find(
+            (ci) => ci.item_name.toLowerCase() === (row.garment_type || '').toLowerCase()
+          );
+          if (anyMatch) {
+            row.price = anyMatch.price;
+          }
         }
       }
 
@@ -136,18 +381,16 @@ export default function CreateOrderModal({
   };
 
   const handleAddItem = () => {
-    // Default next item to same service category
-    const catItems = getCatalogItemsForService(serviceCategory);
-    const defaultName = catItems.length > 0 ? catItems[0].item_name : 'Shirt';
-    const defaultPrice = catItems.length > 0 ? catItems[0].price : 80;
+    const garments = getGarmentsWithPricesForService(serviceCategory);
+    const defaultItem = garments.length > 0 ? garments[0] : { item_name: 'Shirt', price: 80 };
 
     setItems((prev) => [
       ...prev,
       {
-        garment_type: defaultName,
+        garment_type: defaultItem.item_name,
         service_type: serviceCategory,
         quantity: 1,
-        price: defaultPrice,
+        price: defaultItem.price,
         special_notes: ''
       }
     ]);
@@ -509,7 +752,7 @@ export default function CreateOrderModal({
             </div>
 
             {/* Line items table */}
-            <div style={{ border: '1px solid var(--bg-card-border)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
+            <div style={{ border: '1px solid var(--bg-card-border)', borderRadius: 'var(--radius-md)', overflow: 'visible', background: 'var(--bg-card)' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.84rem' }}>
                 <thead>
                   <tr style={{ background: 'var(--bg-secondary)', borderBottom: '1px solid var(--bg-card-border)', textAlign: 'left' }}>
@@ -523,7 +766,6 @@ export default function CreateOrderModal({
                 </thead>
                 <tbody>
                   {items.map((row, idx) => {
-                    const catForService = getCatalogItemsForService(row.service_type);
                     const lineTotal = (Number(row.price) || 0) * (Number(row.quantity) || 1);
 
                     return (
@@ -540,23 +782,19 @@ export default function CreateOrderModal({
                           </select>
                         </td>
 
-                        <td style={{ padding: '0.5rem 0.75rem' }}>
-                          <input
-                            type="text"
-                            list={`catalog-list-${idx}`}
-                            className="form-control form-control-sm"
-                            placeholder="Type or pick garment..."
+                        <td style={{ padding: '0.5rem 0.75rem', position: 'relative' }}>
+                          <GarmentCombobox
                             value={row.garment_type}
-                            onChange={(e) => handleItemChange(idx, 'garment_type', e.target.value)}
-                            required
+                            onChange={(name) => handleItemChange(idx, 'garment_type', name)}
+                            onSelectGarment={(name, price) => {
+                              handleItemChange(idx, 'garment_type', name);
+                              if (price != null) {
+                                handleItemChange(idx, 'price', price);
+                              }
+                            }}
+                            garmentList={getGarmentsWithPricesForService(row.service_type)}
+                            placeholder="Type or select garment..."
                           />
-                          <datalist id={`catalog-list-${idx}`}>
-                            {catForService.map((ci) => (
-                              <option key={ci.id} value={ci.item_name}>
-                                {ci.item_name} (₹{ci.price})
-                              </option>
-                            ))}
-                          </datalist>
                         </td>
 
                         <td style={{ padding: '0.5rem 0.75rem' }}>
