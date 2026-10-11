@@ -4,7 +4,10 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.core.database import SessionLocal
-from app.models.schemas import Order, OrderStatus, PaymentStatus, Customer, OrderItem, CatalogItem, Runner, PointTransaction
+from app.models.schemas import (
+    Order, OrderStatus, PaymentStatus, Customer, OrderItem,
+    CatalogItem, Runner, PointTransaction, OrderType, PaymentMode
+)
 from app.services.crud import get_monthly_order_count, add_points_transaction, now_ist, clean_order_id, get_runners
 from app.services.whatsapp_sender import send_text_message
 
@@ -365,3 +368,197 @@ def cancel_order(order_id: str, db: Session = Depends(get_db)):
         )
 
     return {"message": "Order cancelled successfully"}
+
+class CreateOrderItemInput(BaseModel):
+    garment_type: str
+    service_type: str
+    quantity: int = 1
+    price: float = 0.0
+    special_notes: Optional[str] = None
+
+class CreateCounterOrderRequest(BaseModel):
+    customer_id: Optional[int] = None
+    new_customer_name: Optional[str] = None
+    new_customer_phone: Optional[str] = None
+    new_customer_address: Optional[str] = None
+    
+    # Optional aliases
+    customer_name: Optional[str] = None
+    customer_phone: Optional[str] = None
+    
+    order_type: str = "STORE_DROP"  # "STORE_DROP" (Store Walk-in) or "PICKUP" (Pickup & Delivery)
+    service_category: Optional[str] = "Dry Clean"
+    flat_address: Optional[str] = ""
+    items: List[CreateOrderItemInput] = []
+    
+    total_amount: float = 0.0
+    delivery_fee: float = 0.0
+    points_redeemed: int = 0
+    
+    payment_status: str = "PENDING"  # "PENDING" or "PAID"
+    payment_mode: Optional[str] = "CASH"  # "CASH" or "UPI"
+    runner_id: Optional[int] = None
+    special_instructions: Optional[str] = ""
+    
+    resume_bot: bool = True
+    send_whatsapp_receipt: bool = True
+
+@router.post("/counter")
+def create_counter_order(req: CreateCounterOrderRequest, db: Session = Depends(get_db)):
+    """
+    Creates an in-store counter walk-in order or manual delivery order.
+    Auto-prices garments, sends WhatsApp confirmation receipt, and resets bot state to IDLE.
+    """
+    from app.services.crud import _generate_next_order_id, create_customer
+    from app.services.whatsapp_sender import send_order_receipt_whatsapp
+    from app.core.graph import reset_customer_bot_state
+    from app.core.ws_manager import broadcast_event_sync
+
+    # 1. Resolve Customer
+    customer = None
+    resolved_phone = req.new_customer_phone or req.customer_phone
+    resolved_name = req.new_customer_name or req.customer_name
+    resolved_address = req.new_customer_address or req.flat_address or ""
+
+    if req.customer_id:
+        customer = db.query(Customer).filter_by(customer_id=req.customer_id).first()
+        if not customer:
+            raise HTTPException(status_code=404, detail="Selected customer not found")
+        if req.flat_address and not customer.saved_address:
+            customer.saved_address = req.flat_address
+            db.commit()
+    elif resolved_phone:
+        clean_phone = "".join(filter(str.isdigit, resolved_phone))
+        if not clean_phone or len(clean_phone) < 10:
+            raise HTTPException(status_code=400, detail="Invalid phone number for new customer")
+        
+        customer = db.query(Customer).filter(Customer.phone_number.like(f"%{clean_phone[-10:]}%")).first()
+        if not customer:
+            customer = create_customer(
+                db,
+                phone_number=clean_phone if clean_phone.startswith("91") else f"91{clean_phone}",
+                name=resolved_name or "Walk-in Customer",
+                saved_address=resolved_address
+            )
+        else:
+            if resolved_name and (not customer.name or customer.name.startswith("Customer")):
+                customer.name = resolved_name
+            if resolved_address and not customer.saved_address:
+                customer.saved_address = resolved_address
+            db.commit()
+    else:
+        raise HTTPException(status_code=400, detail="Customer must be selected or phone number provided")
+
+    # 2. Determine Order Types & Initial Status
+    is_store_drop = (req.order_type == "STORE_DROP")
+    order_type_enum = OrderType.STORE_DROP if is_store_drop else OrderType.PICKUP
+    initial_status_enum = OrderStatus.IN_SHOP if is_store_drop else OrderStatus.PENDING_PICKUP
+    payment_status_enum = PaymentStatus.PAID if req.payment_status == "PAID" else PaymentStatus.PENDING
+    payment_mode_enum = None
+    if req.payment_status == "PAID" and req.payment_mode:
+        payment_mode_enum = PaymentMode.UPI if req.payment_mode.upper() == "UPI" else PaymentMode.CASH
+
+    # 3. Generate sequential order ID
+    order_id = _generate_next_order_id(db)
+
+    # 4. Calculate item count & auto-calculate total_amount if not provided
+    total_qty = sum(item.quantity for item in req.items) if req.items else 1
+    items_subtotal = sum(item.quantity * item.price for item in req.items) if req.items else 0.0
+    effective_subtotal = req.total_amount if req.total_amount > 0 else items_subtotal
+
+    # 5. Insert Order
+    db_order = Order(
+        order_id=order_id,
+        customer_id=customer.customer_id,
+        order_type=order_type_enum,
+        status=initial_status_enum,
+        item_count=total_qty,
+        total_amount=effective_subtotal,
+        estimated_amount=effective_subtotal,
+        delivery_fee=0.0 if is_store_drop else req.delivery_fee,
+        points_redeemed=req.points_redeemed,
+        payment_status=payment_status_enum,
+        payment_mode=payment_mode_enum,
+        disclaimer_accepted=True,
+        runner_id=req.runner_id,
+        service_category=req.service_category or "Dry Clean",
+        flat_address=req.flat_address or customer.saved_address or "",
+        special_instructions=req.special_instructions or "",
+        created_at=now_ist(),
+        picked_up_at=now_ist() if is_store_drop else None
+    )
+    db.add(db_order)
+    customer.order_count = (customer.order_count or 0) + 1
+    db.commit()
+    db.refresh(db_order)
+
+    # 6. Insert Order Items
+    for it in req.items:
+        db_item = OrderItem(
+            order_id=order_id,
+            garment_type=it.garment_type,
+            service_type=it.service_type,
+            quantity=it.quantity,
+            special_notes=it.special_notes
+        )
+        db.add(db_item)
+    db.commit()
+
+    # 7. Deduct Points if redeemed
+    if req.points_redeemed > 0:
+        add_points_transaction(db, customer.customer_id, req.points_redeemed, "REDEEMED", order_id)
+
+    # 8. Resume AI Bot & Reset State to IDLE
+    if req.resume_bot:
+        if customer.bot_paused:
+            customer.bot_paused = False
+            db.commit()
+            try:
+                broadcast_event_sync("CHAT_BOT_TOGGLED", {
+                    "customer_id": customer.customer_id,
+                    "bot_paused": False
+                })
+            except Exception:
+                pass
+        # Reset LangGraph conversational checkpoint to clean IDLE
+        reset_customer_bot_state(customer.phone_number)
+
+    # 9. Send WhatsApp Confirmation Receipt
+    if req.send_whatsapp_receipt and customer.phone_number:
+        try:
+            items_payload = [
+                {
+                    "garment_type": it.garment_type,
+                    "service_type": it.service_type,
+                    "quantity": it.quantity,
+                    "price": it.price
+                }
+                for it in req.items
+            ]
+            send_order_receipt_whatsapp(
+                phone_number=customer.phone_number,
+                order_id=order_id,
+                customer_name=customer.name,
+                order_type=req.order_type,
+                items=items_payload,
+                total_amount=effective_subtotal,
+                delivery_fee=0.0 if is_store_drop else req.delivery_fee,
+                points_redeemed=req.points_redeemed,
+                payment_status=req.payment_status
+            )
+        except Exception as e:
+            pass
+
+    # 10. Broadcast real-time WebSocket event
+    try:
+        broadcast_event_sync("ORDER_CREATED", {
+            "order_id": db_order.order_id,
+            "customer_id": customer.customer_id,
+            "item_count": total_qty,
+            "service_category": req.service_category
+        })
+    except Exception:
+        pass
+
+    db.refresh(db_order)
+    return serialize_order(db_order)

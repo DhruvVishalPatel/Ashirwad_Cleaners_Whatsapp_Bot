@@ -87,6 +87,11 @@ export const api = {
     request(`/orders/${orderId}/cancel`, {
       method: 'POST',
     }),
+  createCounterOrder: (payload) =>
+    request('/orders/counter', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
 
   // Customers
   getCustomers: () => request('/customers'),

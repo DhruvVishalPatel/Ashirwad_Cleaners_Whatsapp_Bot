@@ -113,3 +113,53 @@ def send_image_message(to_number: str, image_url: str, caption: str = None, send
     response = requests.post(url, headers=headers, json=payload)
     return response.json()
 
+def send_order_receipt_whatsapp(
+    phone_number: str,
+    order_id: str,
+    customer_name: str,
+    order_type: str,
+    items: list,
+    total_amount: float,
+    delivery_fee: float,
+    points_redeemed: int,
+    payment_status: str
+):
+    """
+    Sends an itemized official WhatsApp order confirmation receipt to the customer.
+    """
+    type_display = "🏬 Walk-in Store Drop" if order_type == "STORE_DROP" else "🚚 Home Pickup & Delivery"
+    pickup_note = "Self-Pickup from Shop" if order_type == "STORE_DROP" else "Home Delivery"
+    payment_display = "PAID (Completed)" if payment_status == "PAID" else "UNPAID (Pending)"
+    
+    items_breakdown = ""
+    for it in items:
+        qty = it.get("quantity", 1)
+        g_name = it.get("garment_type", "Garment")
+        s_type = it.get("service_type", "Dry Clean")
+        u_price = it.get("price") or it.get("unit_price") or 0.0
+        line_tot = float(u_price) * int(qty)
+        items_breakdown += f"• {qty}x {g_name} ({s_type}) - ₹{line_tot:.0f}\n"
+
+    final_total = max(0.0, float(total_amount) + float(delivery_fee) - float(points_redeemed))
+
+    receipt_text = (
+        f"🧺 *ASHIRWAD CLEANERS - ORDER CONFIRMATION*\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"Order ID: *#{order_id}*\n"
+        f"Customer: *{customer_name or 'Valued Customer'}*\n"
+        f"Order Type: *{type_display}*\n\n"
+        f"📦 *Garments Breakdown:*\n"
+        f"{items_breakdown.strip()}\n\n"
+        f"Subtotal: *₹{total_amount:.0f}*\n"
+        f"Delivery Fee: *₹{delivery_fee:.0f} ({pickup_note})*\n"
+        f"Loyalty Discount: *-₹{points_redeemed}*\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"Total Payable: *₹{final_total:.0f}*\n"
+        f"Payment Status: *{payment_display}*\n\n"
+        f"📍 *Shop Address:* G-1, Raj Nagar Complex, Narayan Nagar Road, Paldi, Ahmedabad.\n"
+        f"📞 *Shop Manager:* Faizan (+91 84698 42889)\n\n"
+        f"✨ We will notify you on WhatsApp as soon as your garments are ready!"
+    )
+    return send_text_message(phone_number, receipt_text, sender_type="BOT")
+
+

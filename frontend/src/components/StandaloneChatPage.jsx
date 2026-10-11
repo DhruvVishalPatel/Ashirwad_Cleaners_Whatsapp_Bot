@@ -20,10 +20,20 @@ import {
   LogOut,
   Radio,
   ExternalLink,
-  LayoutDashboard
+  LayoutDashboard,
+  Receipt
 } from 'lucide-react';
+import CreateOrderModal from './CreateOrderModal';
 
-export default function StandaloneChatPage({ wsEvent, theme, toggleTheme, onLogout, wsConnected }) {
+export default function StandaloneChatPage({
+  wsEvent,
+  theme,
+  toggleTheme,
+  onLogout,
+  wsConnected,
+  catalog: propCatalog = [],
+  runners: propRunners = []
+}) {
   const [chats, setChats] = useState([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -36,6 +46,24 @@ export default function StandaloneChatPage({ wsEvent, theme, toggleTheme, onLogo
   const [chatError, setChatError] = useState(null);
   
   const [refreshing, setRefreshing] = useState(false);
+
+  // POS Order Modal State & Catalog/Runners
+  const [isCreateOrderOpen, setIsCreateOrderOpen] = useState(false);
+  const [catalog, setCatalog] = useState(propCatalog || []);
+  const [runners, setRunners] = useState(propRunners || []);
+
+  useEffect(() => {
+    if (propCatalog && propCatalog.length > 0) {
+      setCatalog(propCatalog);
+    } else {
+      api.getCatalog().then((data) => setCatalog(data || [])).catch(() => {});
+    }
+    if (propRunners && propRunners.length > 0) {
+      setRunners(propRunners);
+    } else {
+      api.getRunners().then((data) => setRunners(data || [])).catch(() => {});
+    }
+  }, [propCatalog, propRunners]);
 
   // Mobile responsive view toggle
   const [showMobileChat, setShowMobileChat] = useState(false);
@@ -384,7 +412,26 @@ export default function StandaloneChatPage({ wsEvent, theme, toggleTheme, onLogo
                   </div>
                 </div>
 
-                <div className="chat-header-actions">
+                <div className="chat-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.45rem',
+                      padding: '0.45rem 0.85rem',
+                      fontSize: '0.85rem',
+                      fontWeight: 600,
+                      borderRadius: 'var(--radius-md)'
+                    }}
+                    onClick={() => setIsCreateOrderOpen(true)}
+                    title="Create Counter / Delivery Order for Customer"
+                  >
+                    <Receipt size={16} />
+                    <span>Bill Order</span>
+                  </button>
+
                   <button
                     className={`btn-toggle-bot ${selectedCustomer.bot_paused ? 'paused' : 'active'}`}
                     onClick={handleToggleBot}
@@ -500,6 +547,37 @@ export default function StandaloneChatPage({ wsEvent, theme, toggleTheme, onLogo
           )}
         </main>
       </div>
+
+      {/* POS Order Creation Modal */}
+      {isCreateOrderOpen && (
+        <CreateOrderModal
+          isOpen={isCreateOrderOpen}
+          onClose={() => setIsCreateOrderOpen(false)}
+          customers={chats.map((c) => ({
+            id: c.customer_id,
+            customer_id: c.customer_id,
+            name: c.customer_name,
+            customer_name: c.customer_name,
+            phone_number: c.phone_number,
+            customer_phone: c.phone_number,
+            saved_address: c.saved_address,
+            flat_address: c.saved_address,
+            loyalty_points: c.loyalty_points || 0,
+            bot_paused: c.bot_paused,
+            order_count: c.has_active_order ? 1 : 0
+          }))}
+          catalog={catalog}
+          runners={runners}
+          preSelectedCustomerId={selectedCustomerId}
+          onOrderCreated={async () => {
+            setIsCreateOrderOpen(false);
+            await loadChats(true);
+            if (selectedCustomerId) {
+              await loadMessages(selectedCustomerId, true);
+            }
+          }}
+        />
+      )}
     </div>
   );
 }

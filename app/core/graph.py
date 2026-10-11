@@ -372,3 +372,41 @@ conn.execute("PRAGMA journal_mode=WAL;")
 conn.execute("PRAGMA busy_timeout=5000;")
 memory = SqliteSaver(conn)
 compiled_graph = builder.compile(checkpointer=memory)
+
+def reset_customer_bot_state(phone_number: str):
+    """
+    Resets the customer's conversational state machine in LangGraph back to a clean IDLE state.
+    Used when a human manager takes over, completes an order, or resumes the AI bot.
+    """
+    if not phone_number:
+        return
+    config = {"configurable": {"thread_id": phone_number}}
+    try:
+        current_state = compiled_graph.get_state(config).values
+        if current_state:
+            compiled_graph.update_state(
+                config,
+                {
+                    "current_flow": "IDLE",
+                    "current_state": "",
+                    "last_active_state": "",
+                    "garments_list": [],
+                    "item_count": 0,
+                    "base_estimate": 0.0,
+                    "delivery_fee": 0.0,
+                    "delivery_str": "",
+                    "points_redeemed": 0,
+                    "promo_msg": "",
+                    "max_redeemable": 0,
+                    "final_estimate": 0.0,
+                    "pending_items_input": "",
+                    "direct_order_prefix": "",
+                    "cancel_order_id": "",
+                    "text_input": "",
+                    "response_sent": True
+                }
+            )
+            logger.info(f"[BotState] Successfully reset conversational state to IDLE for thread: {phone_number}")
+    except Exception as e:
+        logger.error(f"[BotState] Error resetting bot state for {phone_number}: {e}")
+

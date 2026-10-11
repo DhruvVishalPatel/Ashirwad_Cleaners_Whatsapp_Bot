@@ -52,6 +52,12 @@ def toggle_bot_pause(customer_id: int, req: ToggleBotRequest, db: Session = Depe
     customer = toggle_customer_bot_pause(db, customer_id, req.paused)
     if not customer:
         raise HTTPException(status_code=404, detail="Customer not found")
+        
+    # When resuming the bot from human takeover, reset conversational state to IDLE
+    if not req.paused:
+        from app.core.graph import reset_customer_bot_state
+        reset_customer_bot_state(customer.phone_number)
+
     return {
         "status": "success",
         "customer_id": customer.customer_id,

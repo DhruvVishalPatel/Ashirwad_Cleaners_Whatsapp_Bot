@@ -223,6 +223,8 @@ export default function App() {
         toggleTheme={toggleTheme}
         onLogout={handleLogout}
         wsConnected={wsConnected}
+        catalog={catalog}
+        runners={runners}
       />
     );
   }
@@ -311,6 +313,7 @@ export default function App() {
         {activeTab === 'orders' && (
           <OrderManagement
             orders={orders}
+            customers={customers}
             runners={runners}
             catalog={catalog}
             onRefresh={(showAll) => fetchAllData(showAll)}

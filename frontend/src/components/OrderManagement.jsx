@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Search, Edit3, X, Plus, Trash2, MapPin, Send, AlertTriangle, Lock, CheckCircle2 } from 'lucide-react';
 import { api, getGoogleMapsUrl } from '../api';
+import CreateOrderModal from './CreateOrderModal';
 
 
 const STATUS_HUMAN_MAP = {
@@ -20,10 +21,11 @@ const PAYMENT_HUMAN_MAP = {
   PAID: 'Paid',
 };
 
-export default function OrderManagement({ orders, runners, catalog, onRefresh }) {
+export default function OrderManagement({ orders, runners, catalog, customers = [], onRefresh }) {
   const [showAll, setShowAll] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   // Edit form state
   const [editAddress, setEditAddress] = useState('');
@@ -279,7 +281,15 @@ export default function OrderManagement({ orders, runners, catalog, onRefresh })
     <div>
       {/* Controls Bar */}
       <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', marginBottom: '1.25rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className="btn btn-primary"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', fontWeight: 600, padding: '0.55rem 1.1rem' }}
+            onClick={() => setIsCreateModalOpen(true)}
+          >
+            <Plus size={16} /> New Counter Order
+          </button>
           <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.9rem' }}>
             <input
               type="checkbox"
@@ -689,6 +699,18 @@ export default function OrderManagement({ orders, runners, catalog, onRefresh })
           </div>
         </div>,
         document.body
+      )}
+
+      {/* POS Counter & Delivery Order Creation Modal */}
+      {isCreateModalOpen && (
+        <CreateOrderModal
+          isOpen={isCreateModalOpen}
+          onClose={() => setIsCreateModalOpen(false)}
+          customers={customers}
+          catalog={catalog}
+          runners={runners}
+          onOrderCreated={() => onRefresh(showAll)}
+        />
       )}
     </div>
   );
