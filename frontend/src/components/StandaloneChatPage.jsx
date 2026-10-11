@@ -439,7 +439,11 @@ export default function StandaloneChatPage({ wsEvent, theme, toggleTheme, onLogo
                             {msg.content}
                             {msg.media_url && (
                               <div className="bubble-media">
-                                <img src={msg.media_url} alt="Shared Media" style={{ maxWidth: '100%', borderRadius: '8px', marginTop: '0.4rem' }} />
+                                <img
+                                  src={msg.media_url}
+                                  alt="Shared Media"
+                                  onLoad={scrollToBottom}
+                                />
                               </div>
                             )}
                           </div>
