@@ -42,6 +42,16 @@ app.include_router(api_router)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+import threading
+from collections import defaultdict
+
+_phone_locks = defaultdict(threading.Lock)
+_phone_locks_mutex = threading.Lock()
+
+def get_phone_lock(phone: str) -> threading.Lock:
+    with _phone_locks_mutex:
+        return _phone_locks[phone]
+
 VERIFY_TOKEN = os.environ.get("VERIFY_TOKEN", "YOUR_CUSTOM_VERIFY_TOKEN")
 
 def process_whatsapp_message(payload: dict):
@@ -82,59 +92,62 @@ def process_whatsapp_message(payload: dict):
         else:
             text = message.get("text", {}).get("body", "")
 
-        # 1. Check or Create Customer
-        with SessionLocal() as db:
-            customer = get_customer(db, phone_number)
-            if not customer:
-                customer = create_customer(db, phone_number)
+        # Lock per phone number to serialize rapid consecutive messages from the same sender
+        phone_lock = get_phone_lock(phone_number)
+        with phone_lock:
+            # 1. Check or Create Customer
+            with SessionLocal() as db:
+                customer = get_customer(db, phone_number)
+                if not customer:
+                    customer = create_customer(db, phone_number)
+                    
+                customer_id = customer.customer_id
+                customer_name = customer.name or ""
+                lang = customer.preferred_language or ""
+                bot_paused = getattr(customer, "bot_paused", False) or False
+
+                # Log inbound customer message to chat_messages
+                log_chat_message(
+                    db,
+                    customer_id=customer_id,
+                    phone_number=phone_number,
+                    sender_type="CUSTOMER",
+                    content=text if text else f"[{msg_type.upper()} MESSAGE]",
+                    message_type=msg_type
+                )
                 
-            customer_id = customer.customer_id
-            customer_name = customer.name or ""
-            lang = customer.preferred_language or ""
-            bot_paused = getattr(customer, "bot_paused", False) or False
+            if bot_paused:
+                logger.info(f"Bot AI is paused for customer {phone_number} ({customer_name}). Skipping auto reply.")
+                return
 
-            # Log inbound customer message to chat_messages
-            log_chat_message(
-                db,
-                customer_id=customer_id,
-                phone_number=phone_number,
-                sender_type="CUSTOMER",
-                content=text if text else f"[{msg_type.upper()} MESSAGE]",
-                message_type=msg_type
-            )
+            # 2. RUN LANGGRAPH AGENT ENGINE
+            config = {"configurable": {"thread_id": phone_number}}
             
-        if bot_paused:
-            logger.info(f"Bot AI is paused for customer {phone_number} ({customer_name}). Skipping auto reply.")
-            return
-
-        # 2. RUN LANGGRAPH AGENT ENGINE
-        config = {"configurable": {"thread_id": phone_number}}
-        
-        # Get existing thread state if any
-        current_state_data = compiled_graph.get_state(config).values
-        
-        if not current_state_data:
-            current_state_data = {
-                "phone_number": phone_number,
-                "customer_id": customer_id,
-                "language": lang,
-                "current_flow": "IDLE",
-                "current_state": "",
-                "last_active_state": "",
-                "customer_name": customer_name,
-                "garments_list": [],
-                "item_count": 0,
-                "points_redeemed": 0,
-                "saved_address": "",
-                "pending_items_input": "",
-                "direct_order_prefix": ""
-            }
+            # Get existing thread state if any
+            current_state_data = compiled_graph.get_state(config).values
             
-        # Update text input and run graph
-        current_state_data["text_input"] = text
-        logger.info(f"Invoking StateGraph for customer_id: {current_state_data.get('customer_id')} with input: '{text}'")
-        compiled_graph.invoke(current_state_data, config)
-        logger.info(f"StateGraph invocation finished successfully for customer_id: {current_state_data.get('customer_id')}")
+            if not current_state_data:
+                current_state_data = {
+                    "phone_number": phone_number,
+                    "customer_id": customer_id,
+                    "language": lang,
+                    "current_flow": "IDLE",
+                    "current_state": "",
+                    "last_active_state": "",
+                    "customer_name": customer_name,
+                    "garments_list": [],
+                    "item_count": 0,
+                    "points_redeemed": 0,
+                    "saved_address": "",
+                    "pending_items_input": "",
+                    "direct_order_prefix": ""
+                }
+                
+            # Update text input and run graph
+            current_state_data["text_input"] = text
+            logger.info(f"Invoking StateGraph for customer_id: {current_state_data.get('customer_id')} with input: '{text}'")
+            compiled_graph.invoke(current_state_data, config)
+            logger.info(f"StateGraph invocation finished successfully for customer_id: {current_state_data.get('customer_id')}")
         
     except Exception as e:
         logger.error(f"Error processing message: {e}\n{traceback.format_exc()}")

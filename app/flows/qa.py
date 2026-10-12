@@ -44,6 +44,12 @@ def qa_node(state: dict) -> Dict[str, Any]:
     """
     lang = state["language"]
     text = state["text_input"]
+    clean_text = text.strip().lower()
+    
+    pricing_keywords = ["pricing", "price list", "price", "prices", "rate list", "rates", "rate", "bhav", "cost", "charges"]
+    if any(k in clean_text.split() for k in pricing_keywords) or any(k in clean_text for k in ["check pricing", "price list", "rate list", "bhav"]):
+        from app.flows.pricing import pricing_node
+        return pricing_node(state)
     
     reply = answer_general_query(text, lang)
     if not reply:

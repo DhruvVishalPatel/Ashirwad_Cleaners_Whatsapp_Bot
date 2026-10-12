@@ -22,6 +22,7 @@ def classify_intent(user_text: str) -> tuple[str, str]:
     - INTENT_GREETING: General greetings, hellos, start-of-conversation indicators (e.g. "hi", "hello", "hey", "kem cho", "namaste").
     - INTENT_QA: The user is asking questions about delivery times, business rules, service locations, specific items, or seeking help/complaining (e.g. "how much time for delivery", "carpet wash hota hai").
     - INTENT_CHANGE_LANGUAGE: The user explicitly wants to change language, switch language, or choose a different language to speak in (e.g. "change language", "language badlo", "switch to English", "gujarati select kar", "bhasha badlvi che").
+    - INTENT_PROVIDE_NAME: The user is stating their personal name, introducing themselves, or responding with their name (e.g. "Shlok Thakkar", "Faizan", "Dhruv Patel", "my name is Rahul", "I am Priya", "Ankit").
     
     Also, detect the language style of the input:
     - ENGLISH: If the input is primarily standard English (e.g., "I want to schedule a pickup", "what is the price").
@@ -46,7 +47,7 @@ def classify_intent(user_text: str) -> tuple[str, str]:
                 "properties": {
                     "intent": {
                         "type": "string",
-                        "enum": ["INTENT_PICKUP", "INTENT_STATUS", "INTENT_CANCEL_ORDER", "INTENT_PRICING", "INTENT_GREETING", "INTENT_QA", "INTENT_CHANGE_LANGUAGE"]
+                        "enum": ["INTENT_PICKUP", "INTENT_STATUS", "INTENT_CANCEL_ORDER", "INTENT_PRICING", "INTENT_GREETING", "INTENT_QA", "INTENT_CHANGE_LANGUAGE", "INTENT_PROVIDE_NAME"]
                     },
                     "detected_language": {
                         "type": "string",

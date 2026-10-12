@@ -106,7 +106,19 @@ def pickup_name_node(state: dict) -> Dict[str, Any]:
                 "response_sent": True
             }
             
-        name = input_text
+        clean_name = re.sub(r'^(?:my\s+name\s+is|i\s+am|i\'m|this\s+is|mera\s+naam|maru\s+naam|naam)\s*[:\-]?\s*', '', input_text, flags=re.IGNORECASE).strip()
+        clean_name = re.sub(r'\s+(?:hai|che)$', '', clean_name, flags=re.IGNORECASE).strip().strip('"\'.,')
+        name = clean_name if clean_name else input_text
+        
+        # Guard: check if name is accidentally a pricing, service, or question string
+        invalid_name_keywords = ["price", "pricing", "bhav", "rate", "cost", "cancel", "pickup", "laundry", "order", "clean", "iron"]
+        if any(w in name.lower().split() for w in invalid_name_keywords) or len(name.split()) > 5:
+            send_text_message(state["phone_number"], t("ASK_NAME", lang))
+            return {
+                "current_state": "PICKUP_AWAITING_NAME",
+                "response_sent": True
+            }
+            
         with SessionLocal() as db:
             update_customer_name(db, state["customer_id"], name)
         
@@ -209,10 +221,23 @@ def pickup_items_node(state: dict) -> Dict[str, Any]:
     text = state["text_input"]
     clean_text = text.strip().lower()
     
+    # Extra safety guard: If user asks for pricing or rates here, show the price list photo!
+    pricing_keywords = ["pricing", "price list", "price", "prices", "rate list", "rates", "rate", "bhav", "cost", "charges"]
+    if any(k in clean_text.split() for k in pricing_keywords) or any(k in clean_text for k in ["check pricing", "price list", "rate list", "bhav"]):
+        from app.flows.pricing import pricing_node
+        state["last_active_state"] = "PICKUP_AWAITING_ITEMS"
+        return pricing_node(state)
+    
     estimate_data = generate_estimate(text, lang)
     
     if estimate_data.get("is_question") and not estimate_data.get("garments"):
+        # Check if the conversational reply or question was about pricing
         reply_msg = estimate_data.get('reply') or ""
+        if any(k in reply_msg.lower() for k in ["price", "pricing", "rate", "bhav", "cost"]) or any(k in clean_text for k in pricing_keywords):
+            from app.flows.pricing import pricing_node
+            state["last_active_state"] = "PICKUP_AWAITING_ITEMS"
+            return pricing_node(state)
+            
         msg_to_send = reply_msg if reply_msg else t('ESTIMATE_QUESTION_SUFFIX', lang).lstrip()
         send_text_message(state["phone_number"], msg_to_send)
         return {

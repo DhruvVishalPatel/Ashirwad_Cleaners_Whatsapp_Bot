@@ -109,6 +109,47 @@ def classifier_node(state: BotState) -> Dict[str, Any]:
             "response_sent": False
         }
 
+    # 1.2 Global Intent Buttons or Tapped Options (from Greeting or elsewhere)
+    is_pricing_intent_btn = (
+        text == "btn_intent_pricing" or
+        any(k in clean_text for k in ["check pricing", "price list", "rate list", "rates list", "pricing / rate list", "bhav / pricing"]) or
+        clean_text.strip("?!. ") in ["check pricing", "pricing", "rate list", "price list", "price", "prices", "rates", "rate", "bhav", "cost", "charges"]
+    )
+    if is_pricing_intent_btn:
+        logger.info("[ClassifierNode] Direct pricing intent triggered via button or exact keyword.")
+        return {
+            "current_flow": "PRICING",
+            "current_state": "",
+            "last_active_state": state.get("current_state", ""),
+            "response_sent": False
+        }
+
+    is_status_intent_btn = (
+        text == "btn_intent_status" or
+        clean_text in ["order status", "order status / track", "order track karo", "track order", "status"]
+    )
+    if is_status_intent_btn:
+        logger.info("[ClassifierNode] Direct status intent triggered via button or exact keyword.")
+        return {
+            "current_flow": "STATUS",
+            "current_state": "",
+            "last_active_state": state.get("current_state", ""),
+            "response_sent": False
+        }
+
+    is_pickup_intent_btn = (
+        text == "btn_intent_pickup" or
+        clean_text in ["schedule pickup", "pickup / book", "pickup book karo"]
+    )
+    if is_pickup_intent_btn:
+        logger.info("[ClassifierNode] Direct pickup intent triggered via button or exact keyword.")
+        if state.get("current_flow") != "PICKUP":
+            return {
+                "current_flow": "PICKUP",
+                "current_state": "",
+                "response_sent": False
+            }
+
     # 2. Global Reset Keywords
     reset_keywords = ["cancel", "restart", "start over", "reset", "radd", "cancel karo", "shuru se", "radd karo", "chodi do", "fari shuru karo"]
     if clean_text in reset_keywords and state.get("current_flow") != "CANCEL":
@@ -135,19 +176,116 @@ def classifier_node(state: BotState) -> Dict[str, Any]:
         if state.get("current_flow") == "CANCEL":
             return {"response_sent": False}
 
-        if text.startswith("btn_"):
-            return {"response_sent": False}
-            
-        if state.get("current_state") in ["PICKUP_AWAITING_NAME", "PICKUP_AWAITING_CONFIRMATION_ADDRESS", "PICKUP_AWAITING_OUTSIDE_PALDI_CHOICE"]:
-            return {"response_sent": False}
-            
+        # Check button synonyms for specific prompt states
         if state.get("current_state") in ["PICKUP_AWAITING_POINTS_REDEEM", "PICKUP_AWAITING_ADDRESS_BUTTON", "PICKUP_AWAITING_OUTSIDE_PALDI_CHOICE"]:
             syn = match_button_synonym(text, state["current_state"])
             if syn in ["btn_redeem_yes", "btn_redeem_no", "btn_addr_yes", "btn_addr_new", "btn_outside_store_drop", "btn_outside_paldi_addr", "btn_outside_cancel"]:
                 return {"response_sent": False}
-                
+
         intent, detected_lang = classify_intent(text)
-        
+        user_lang = state.get("language") if state.get("language") in ["ENGLISH", "HINGLISH", "GUJLISH"] else detected_lang
+
+        # 4.1 When Awaiting Customer Name
+        if state.get("current_state") == "PICKUP_AWAITING_NAME":
+            if intent == "INTENT_PROVIDE_NAME":
+                return {"response_sent": False}
+            elif intent == "INTENT_PRICING":
+                logger.info("[ClassifierNode] User requested pricing while awaiting name. Routing to PRICING.")
+                return {
+                    "language": user_lang,
+                    "current_flow": "PRICING",
+                    "current_state": "",
+                    "last_active_state": "PICKUP_AWAITING_NAME",
+                    "response_sent": False
+                }
+            elif intent == "INTENT_GREETING":
+                logger.info("[ClassifierNode] Greeting received while awaiting name. Resetting to GREETING.")
+                return {
+                    "current_flow": "GREETING",
+                    "current_state": "",
+                    "last_active_state": "",
+                    "garments_list": [],
+                    "item_count": 0,
+                    "points_redeemed": 0,
+                    "saved_address": "",
+                    "pending_items_input": "",
+                    "direct_order_prefix": "",
+                    "response_sent": False
+                }
+            elif intent == "INTENT_CANCEL_ORDER":
+                return {
+                    "current_flow": "CANCEL",
+                    "current_state": "",
+                    "response_sent": False
+                }
+            elif intent == "INTENT_CHANGE_LANGUAGE":
+                return {
+                    "current_flow": "CHANGE_LANGUAGE",
+                    "current_state": "",
+                    "last_active_state": "",
+                    "response_sent": False
+                }
+            elif intent == "INTENT_STATUS":
+                return {
+                    "current_flow": "STATUS",
+                    "current_state": "",
+                    "last_active_state": "PICKUP_AWAITING_NAME",
+                    "response_sent": False
+                }
+            elif intent == "INTENT_QA":
+                is_question = (
+                    "?" in text or
+                    any(q in clean_text for q in ["how", "what", "where", "when", "why", "who", "kya", "kahan", "kab", "kem", "su", "kain", "time", "hours", "shop", "address", "cost", "price", "rate", "delivery"]) or
+                    len(clean_text.split()) > 4
+                )
+                if is_question:
+                    logger.info("[ClassifierNode] User asked QA question while awaiting name. Routing to QA.")
+                    return {
+                        "language": user_lang,
+                        "current_flow": "QA",
+                        "last_active_state": "PICKUP_AWAITING_NAME",
+                        "response_sent": False
+                    }
+                else:
+                    return {"response_sent": False}
+            elif intent == "INTENT_PICKUP":
+                return {"response_sent": False}
+            else:
+                return {"response_sent": False}
+
+        # 4.2 When Awaiting Address
+        if state.get("current_state") in ["PICKUP_AWAITING_CONFIRMATION_ADDRESS", "PICKUP_AWAITING_OUTSIDE_PALDI_CHOICE"]:
+            if intent == "INTENT_PRICING":
+                return {
+                    "language": user_lang,
+                    "current_flow": "PRICING",
+                    "current_state": "",
+                    "last_active_state": state.get("current_state"),
+                    "response_sent": False
+                }
+            elif intent == "INTENT_CANCEL_ORDER":
+                return {
+                    "current_flow": "CANCEL",
+                    "current_state": "",
+                    "response_sent": False
+                }
+            elif intent == "INTENT_GREETING":
+                return {
+                    "current_flow": "GREETING",
+                    "current_state": "",
+                    "response_sent": False
+                }
+            elif intent == "INTENT_QA":
+                is_question = "?" in text or any(q in clean_text for q in ["how", "what", "where", "when", "kya", "kahan", "kem", "time", "hours", "cost", "price"])
+                if is_question:
+                    return {
+                        "language": user_lang,
+                        "current_flow": "QA",
+                        "last_active_state": state.get("current_state"),
+                        "response_sent": False
+                    }
+            return {"response_sent": False}
+
         if intent == "INTENT_GREETING":
             logger.info(f"[ClassifierNode] Greeting received during active flow '{state.get('current_flow')}'. Resetting state.")
             return {
@@ -177,7 +315,6 @@ def classifier_node(state: BotState) -> Dict[str, Any]:
                 "change clothes" in clean_text or "items badlo" in clean_text or "kapde badlo" in clean_text
             )
             
-            user_lang = state.get("language") if state.get("language") in ["ENGLISH", "HINGLISH", "GUJLISH"] else detected_lang
             if is_item_modification or (intent == "INTENT_PICKUP" and state.get("current_state") in ["PICKUP_AWAITING_POINTS_REDEEM", "PICKUP_AWAITING_ADDRESS_BUTTON", "PICKUP_AWAITING_CONFIRMATION_ADDRESS"]):
                 return {
                     "language": user_lang,
@@ -217,8 +354,15 @@ def classifier_node(state: BotState) -> Dict[str, Any]:
                 "response_sent": False
             }
 
-        user_lang = state.get("language") if state.get("language") in ["ENGLISH", "HINGLISH", "GUJLISH"] else detected_lang
-        if intent in ["INTENT_QA", "INTENT_PRICING"]:
+        if intent == "INTENT_PRICING":
+            return {
+                "language": user_lang,
+                "current_flow": "PRICING",
+                "last_active_state": state.get("current_state", ""),
+                "response_sent": False
+            }
+
+        if intent == "INTENT_QA":
             return {
                 "language": user_lang,
                 "current_flow": "QA",
@@ -228,7 +372,7 @@ def classifier_node(state: BotState) -> Dict[str, Any]:
             
         return {"response_sent": False}
         
-    # 5. New Intent Routing
+    # 5. New Intent Routing (when IDLE)
     if text == "btn_intent_pickup":
         intent, detected_lang = "INTENT_PICKUP", state["language"]
     elif text == "btn_intent_status":
@@ -253,7 +397,8 @@ def classifier_node(state: BotState) -> Dict[str, Any]:
         "INTENT_PRICING": "PRICING",
         "INTENT_GREETING": "GREETING",
         "INTENT_QA": "QA",
-        "INTENT_CHANGE_LANGUAGE": "CHANGE_LANGUAGE"
+        "INTENT_CHANGE_LANGUAGE": "CHANGE_LANGUAGE",
+        "INTENT_PROVIDE_NAME": "PICKUP"
     }
     
     next_flow = flow_mapping.get(intent, "QA")
