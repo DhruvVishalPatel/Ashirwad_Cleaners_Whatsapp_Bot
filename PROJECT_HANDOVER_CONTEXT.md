@@ -97,6 +97,16 @@
   * Cleans spaces, dashes, `+`, and leading `0`.
   * Applied across `send_text_message`, `send_interactive_buttons`, `send_image_message`, and `create_counter_order`.
 
+### 5. Pricing Flow & Photo Dispatch ([pricing.py](file:///Users/dhruvpatel/PROJECTS/Ashirwad_Cleaners_Bot/app/flows/pricing.py), [graph.py](file:///Users/dhruvpatel/PROJECTS/Ashirwad_Cleaners_Bot/app/core/graph.py))
+* Direct button taps (`btn_intent_pricing`, "Check Pricing") and user pricing inquiries (e.g. "pricing", "rate list", "bhav") immediately trigger `pricing_node`.
+* `pricing_node` dispatches the full price list image (`https://api.ashirwadcleaners.in/static/price_list.png`) with caption.
+* Seamlessly resumes any active interrupted booking flow (e.g. re-prompting for items or customer name) without losing context.
+* Intercepts inquiries during `PICKUP_AWAITING_ITEMS` and `qa_node` so verbal text estimates are never sent in place of the price list image.
+
+### 6. Inbound Message Mutex & Intent Classification ([main.py](file:///Users/dhruvpatel/PROJECTS/Ashirwad_Cleaners_Bot/app/main.py), [llm_router.py](file:///Users/dhruvpatel/PROJECTS/Ashirwad_Cleaners_Bot/app/core/llm_router.py))
+* Added per-phone mutex locking (`get_phone_lock(phone_number)`) in webhook worker to serialize rapid back-to-back incoming messages from the same user, preventing LangGraph SQLite checkpointer race conditions.
+* Added `INTENT_PROVIDE_NAME` to Gemini intent classification schema and prompt to accurately distinguish customer names (e.g. "Shlok Thakkar") from pricing requests or greetings.
+
 ---
 
 ## 5. Active Critical Issue: WhatsApp Receipt Delivery on New Numbers
@@ -177,4 +187,4 @@ After making any code changes in this workspace:
    ```
 
 ---
-*Created on 2026-10-12. Verified up to commit `8e9ebb9`.*
+*Created on 2026-10-12. Verified up to commit `0f58a6e`.*
